@@ -2,7 +2,7 @@ import json
 import uuid
 import math
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
@@ -16,7 +16,8 @@ from app.schemas import (
     PolicyEvaluationResult,
     SimulationOutcome,
     LLMDiagnosisOutput,
-    MultiSeedEvaluationResult
+    MultiSeedEvaluationResult,
+    RiskProfile
 )
 from app.services.llm_service import LLMService
 from app.services.policy_engine import PolicyEngine
@@ -35,12 +36,15 @@ class RecoveryOrchestrator:
     ) -> RecoveryPipelineResponse:
         """
         Executes the end-to-end recovery pipeline for a single failed payment with Idempotency Protection:
+        
         1. Atomic Check of event_id idempotency (Block duplicates)
-        2. Risk / Context Assessment & Candidate Action Economics Evaluation
-        3. Contextual LLM Diagnosis (or deterministic fallback)
-        4. Deterministic Policy Engine Authorization (Strict Final Authority)
-        5. Simulation Outcome (Gross revenue, synthetic intervention cost, net revenue)
-        6. Audit Log & Processed Event Persistence
+        2. Structured Risk Assessment (Financial exposure, customer tier, fatigue, security)
+        3. Contextual LLM Diagnosis (Advisory only, with deterministic fallback)
+        4. Candidate Action Economics (Expected net recovery under simulation assumptions)
+        5. Deterministic Policy Engine Authorization (Strict Final Authority)
+        6. Policy-Approved Final Action
+        7. Simulation / Execution (Revenue recovered vs Fraud loss prevented)
+        8. Audit Log & Processed Event Persistence
         """
         effective_event_id = event_id or f"evt_{payment.transaction_id}_{payment.retry_count}_{uuid.uuid4().hex[:6]}"
 
@@ -49,32 +53,33 @@ class RecoveryOrchestrator:
         if existing_event:
             return cls._handle_duplicate_event(payment, effective_event_id, existing_event, db)
 
-        # ==================== STEP 2: RISK & ECONOMIC EVALUATION ====================
-        policy_checks = PolicyEngine.evaluate_candidate_eligibility(payment)
-        economic_eval = SimulationEngine.evaluate_action_economics(payment, policy_checks)
-        risk_profile = RiskEngine.evaluate_risk(payment)
+        # ==================== STEP 2: STRUCTURED RISK ASSESSMENT ====================
+        risk_profile: RiskProfile = RiskEngine.evaluate_risk(payment)
 
-        # ==================== STEP 3: CONTEXTUAL AI DIAGNOSIS ====================
-        diagnosis, llm_mode = LLMService.diagnose_payment(payment)
+        # ==================== STEP 3: CONTEXTUAL LLM DIAGNOSIS (ADVISORY ONLY) ====================
+        diagnosis, llm_mode = LLMService.diagnose_payment(payment, risk_profile=risk_profile)
         
-        # ==================== STEP 4: DETERMINISTIC POLICY ENGINE ====================
+        # ==================== STEP 4: ECONOMIC EVALUATION ====================
+        policy_checks = PolicyEngine.evaluate_candidate_eligibility(payment)
+        economic_eval = SimulationEngine.evaluate_action_economics(payment, policy_checks, diagnosis=diagnosis)
+
+        # ==================== STEP 5: DETERMINISTIC POLICY ENGINE (FINAL AUTHORITY) ====================
         policy_eval = PolicyEngine.evaluate(payment, diagnosis)
         
-        # ==================== STEP 5: SIMULATION OUTCOME ====================
+        # ==================== STEP 6 & 7: SIMULATION EXECUTION ====================
         outcome = SimulationEngine.simulate_ai_recovery(payment, policy_eval.approved_action)
         
-        # ==================== STEP 6: UPDATE PAYMENT RECORD ====================
+        # ==================== UPDATE PAYMENT RECORD ====================
         payment.recovery_action_taken = policy_eval.approved_action.value
         payment.status = outcome.status
         payment.recovered_amount = outcome.recovered_amount
+        payment.fraud_loss_prevented = outcome.fraud_loss_prevented
         payment.intervention_cost = outcome.intervention_cost
         payment.net_recovered_amount = outcome.net_recovered_amount
-        if outcome.status == "RECOVERED":
-            payment.retry_count += 1
-        elif policy_eval.approved_action == RecoveryActionEnum.RETRY:
+        if policy_eval.approved_action == RecoveryActionEnum.RETRY:
             payment.retry_count += 1
 
-        # ==================== STEP 7: RECORD AUDIT & IDEMPOTENCY ====================
+        # ==================== STEP 8: RECORD AUDIT & IDEMPOTENCY ====================
         audit_entry = AuditLog(
             payment_id=payment.id,
             transaction_id=payment.transaction_id,
@@ -89,6 +94,7 @@ class RecoveryOrchestrator:
             simulation_status=outcome.status,
             simulated_probability=outcome.simulated_probability,
             recovered_amount=outcome.recovered_amount,
+            fraud_loss_prevented=outcome.fraud_loss_prevented,
             intervention_cost=outcome.intervention_cost,
             net_recovered_amount=outcome.net_recovered_amount,
             duplicate_blocked=False,
@@ -100,7 +106,8 @@ class RecoveryOrchestrator:
                 "amount": payment.amount,
                 "error_code": payment.error_code,
                 "event_id": effective_event_id,
-                "risk_profile": risk_profile,
+                "risk_profile": risk_profile.model_dump(),
+                "key_factors": diagnosis.key_factors,
                 "why_this_action": economic_eval.why_this_action,
                 "optimal_economic_action": economic_eval.optimal_economic_action,
                 "optimal_expected_net": economic_eval.optimal_expected_net
@@ -116,12 +123,14 @@ class RecoveryOrchestrator:
             action_approved=policy_eval.approved_action.value,
             simulation_status=outcome.status,
             recovered_amount=outcome.recovered_amount,
+            fraud_loss_prevented=outcome.fraud_loss_prevented,
             intervention_cost=outcome.intervention_cost,
             net_recovered_amount=outcome.net_recovered_amount,
             response_json=json.dumps({
                 "action": policy_eval.approved_action.value,
                 "status": outcome.status,
                 "recovered_amount": outcome.recovered_amount,
+                "fraud_loss_prevented": outcome.fraud_loss_prevented,
                 "intervention_cost": outcome.intervention_cost,
                 "net_recovered_amount": outcome.net_recovered_amount
             })
@@ -143,6 +152,7 @@ class RecoveryOrchestrator:
             event_id=effective_event_id,
             is_duplicate=False,
             message="Recovery action authorized and simulated successfully.",
+            risk_profile=risk_profile,
             llm_mode=llm_mode,
             llm_diagnosis=diagnosis,
             economic_evaluation=economic_eval,
@@ -174,6 +184,7 @@ class RecoveryOrchestrator:
             simulation_status="DUPLICATE_BLOCKED",
             simulated_probability=0.0,
             recovered_amount=0.0,
+            fraud_loss_prevented=0.0,
             intervention_cost=0.0,
             net_recovered_amount=0.0,
             duplicate_blocked=True,
@@ -194,12 +205,14 @@ class RecoveryOrchestrator:
             event_id=event_id,
             is_duplicate=True,
             message=f"DUPLICATE_BLOCKED: Event '{event_id}' was already processed. Duplicate recovery rejected.",
+            risk_profile=None,
             llm_mode="Idempotency Guard",
             llm_diagnosis=LLMDiagnosisOutput(
                 root_cause_diagnosis="Duplicate event submission",
                 confidence=1.0,
                 recommended_action=RecoveryActionEnum.NO_ACTION,
-                rationale="Idempotency protection prevented duplicate financial processing."
+                rationale="Idempotency protection prevented duplicate financial processing.",
+                key_factors=["Duplicate event ID provided", "Action blocked to preserve financial idempotency"]
             ),
             economic_evaluation=None,
             policy_evaluation=PolicyEvaluationResult(
@@ -213,6 +226,7 @@ class RecoveryOrchestrator:
                 status="DUPLICATE_BLOCKED",
                 simulated_probability=0.0,
                 recovered_amount=0.0,
+                fraud_loss_prevented=0.0,
                 intervention_cost=0.0,
                 net_recovered_amount=0.0,
                 notes=f"Duplicate event '{event_id}' blocked."
@@ -221,23 +235,30 @@ class RecoveryOrchestrator:
         )
 
     @classmethod
-    def run_batch_ai_recovery(cls, db: Session) -> Dict[str, Any]:
-        """Runs RecoverAI across all 100 failed payment records."""
+    def run_batch_ai_recovery(cls, db: Session, force_reprocess: bool = False) -> Dict[str, Any]:
+        """Runs RecoverAI across all failed payment records."""
         payments = db.query(PaymentRecord).all()
         processed_count = 0
         recovered_count = 0
+        fraud_blocked_count = 0
         total_recovered_revenue = 0.0
+        total_fraud_loss_prevented = 0.0
         total_intervention_cost = 0.0
         total_net_recovered_revenue = 0.0
         overrides_count = 0
         
         for payment in payments:
+            if not force_reprocess and payment.status in ["RECOVERED", "FRAUD_BLOCKED"]:
+                continue
             event_id = f"evt_batch_{payment.transaction_id}_{payment.retry_count}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:4]}"
             res = cls.process_single_payment(payment, db, event_id=event_id)
             processed_count += 1
             if res.simulation_outcome.status == "RECOVERED":
                 recovered_count += 1
                 total_recovered_revenue += res.simulation_outcome.recovered_amount
+            elif res.simulation_outcome.status == "FRAUD_BLOCKED":
+                fraud_blocked_count += 1
+                total_fraud_loss_prevented += res.simulation_outcome.fraud_loss_prevented
             total_intervention_cost += res.simulation_outcome.intervention_cost
             total_net_recovered_revenue += res.simulation_outcome.net_recovered_amount
             if res.policy_evaluation.is_overridden:
@@ -246,7 +267,9 @@ class RecoveryOrchestrator:
         return {
             "processed_count": processed_count,
             "recovered_count": recovered_count,
+            "fraud_blocked_count": fraud_blocked_count,
             "total_recovered_revenue": round(total_recovered_revenue, 2),
+            "total_fraud_loss_prevented": round(total_fraud_loss_prevented, 2),
             "total_intervention_cost": round(total_intervention_cost, 2),
             "total_net_recovered_revenue": round(total_net_recovered_revenue, 2),
             "overrides_count": overrides_count
@@ -254,7 +277,7 @@ class RecoveryOrchestrator:
 
     @classmethod
     def run_baseline_simulation(cls, db: Session) -> Dict[str, Any]:
-        """Runs Baseline 1: Naive Blind 3x Retry across all 100 records."""
+        """Runs Baseline 1: Naive Blind 3x Retry across all records."""
         payments = db.query(PaymentRecord).all()
         recovered_count = 0
         total_recovered_revenue = 0.0
@@ -267,6 +290,7 @@ class RecoveryOrchestrator:
             res = SimulationEngine.simulate_baseline_recovery(payment)
             payment.baseline_status = res["status"]
             payment.baseline_recovered_amount = res["recovered_amount"]
+            payment.baseline_fraud_loss_prevented = res.get("fraud_loss_prevented", 0.0)
             payment.baseline_intervention_cost = res["intervention_cost"]
             payment.baseline_net_recovered_amount = res["net_recovered_amount"]
             payment.baseline_retries = res["retries_executed"]
@@ -293,10 +317,12 @@ class RecoveryOrchestrator:
 
     @classmethod
     def run_rule_based_simulation(cls, db: Session) -> Dict[str, Any]:
-        """Runs Baseline 2: Simple Rule-Based Recovery across all 100 records."""
+        """Runs Baseline 2: Simple Rule-Based Recovery across all records."""
         payments = db.query(PaymentRecord).all()
         recovered_count = 0
+        fraud_blocked_count = 0
         total_recovered_revenue = 0.0
+        total_fraud_loss_prevented = 0.0
         total_intervention_cost = 0.0
         total_net_recovered_revenue = 0.0
         total_retries = 0
@@ -307,6 +333,7 @@ class RecoveryOrchestrator:
             payment.rule_baseline_status = res["status"]
             payment.rule_baseline_action = res["action"]
             payment.rule_baseline_recovered_amount = res["recovered_amount"]
+            payment.rule_baseline_fraud_loss_prevented = res.get("fraud_loss_prevented", 0.0)
             payment.rule_baseline_intervention_cost = res["intervention_cost"]
             payment.rule_baseline_net_recovered_amount = res["net_recovered_amount"]
             payment.rule_baseline_retries = res["retries_executed"]
@@ -318,13 +345,18 @@ class RecoveryOrchestrator:
             if res["status"] == "RECOVERED":
                 recovered_count += 1
                 total_recovered_revenue += res["recovered_amount"]
+            elif res["status"] == "FRAUD_BLOCKED":
+                fraud_blocked_count += 1
+                total_fraud_loss_prevented += res.get("fraud_loss_prevented", 0.0)
 
         db.commit()
 
         return {
             "processed_count": len(payments),
             "recovered_count": recovered_count,
+            "fraud_blocked_count": fraud_blocked_count,
             "total_recovered_revenue": round(total_recovered_revenue, 2),
+            "total_fraud_loss_prevented": round(total_fraud_loss_prevented, 2),
             "total_intervention_cost": round(total_intervention_cost, 2),
             "total_net_recovered_revenue": round(total_net_recovered_revenue, 2),
             "total_retries": total_retries,
@@ -342,13 +374,31 @@ class RecoveryOrchestrator:
         payments = db.query(PaymentRecord).all()
         total_records = len(payments)
         total_revenue_at_risk = sum(p.amount for p in payments)
+        payment_ids = [p.id for p in payments]
         
         latest_audit = db.query(AuditLog).order_by(AuditLog.id.desc()).first()
         current_llm_mode = latest_audit.llm_mode if latest_audit else "Deterministic Fallback Mode"
 
+        # Calculate run-isolated override counts for the active dataset (Phase 8 fix)
+        overrides_count = 0
+        if payment_ids:
+            latest_audits = (
+                db.query(AuditLog)
+                .filter(AuditLog.payment_id.in_(payment_ids))
+                .order_by(AuditLog.id.desc())
+                .all()
+            )
+            seen_payments: Set[int] = set()
+            for audit in latest_audits:
+                if audit.payment_id not in seen_payments:
+                    seen_payments.add(audit.payment_id)
+                    if audit.policy_override and not audit.duplicate_blocked:
+                        overrides_count += 1
+
         # 1. RecoverAI Strategy
         ai_recovered_payments = [p for p in payments if p.status == "RECOVERED"]
         ai_recovered_revenue = sum(p.recovered_amount for p in ai_recovered_payments)
+        ai_fraud_loss_prevented = sum(p.fraud_loss_prevented for p in payments)
         ai_intervention_cost = sum(p.intervention_cost for p in payments)
         ai_net_recovered_revenue = ai_recovered_revenue - ai_intervention_cost
         
@@ -357,8 +407,7 @@ class RecoveryOrchestrator:
         ai_tx_recovery_rate = (len(ai_recovered_payments) / total_records * 100) if total_records > 0 else 0.0
         
         ai_retries_executed = sum(1 for p in payments if p.recovery_action_taken == "RETRY")
-        overrides_count = db.query(AuditLog).filter(AuditLog.policy_override == True).count()
-        fraud_blocks = sum(1 for p in payments if p.error_code == "SUSPECTED_FRAUD" and p.recovery_action_taken in ["NO_ACTION", "ESCALATE"])
+        fraud_blocks = sum(1 for p in payments if p.status == "FRAUD_BLOCKED" or (p.error_code == "SUSPECTED_FRAUD" and p.recovery_action_taken in ["NO_ACTION", "ESCALATE"]))
         escalations = sum(1 for p in payments if p.recovery_action_taken == "ESCALATE")
 
         ai_metrics = StrategyMetrics(
@@ -366,6 +415,7 @@ class RecoveryOrchestrator:
             description="Contextual LLM root cause diagnosis with deterministic policy guardrails and expected net value optimization.",
             total_revenue_at_risk=round(total_revenue_at_risk, 2),
             total_recovered_revenue=round(ai_recovered_revenue, 2),
+            total_fraud_loss_prevented=round(ai_fraud_loss_prevented, 2),
             total_intervention_cost=round(ai_intervention_cost, 2),
             total_net_recovered_revenue=round(ai_net_recovered_revenue, 2),
             revenue_recovery_rate_pct=round(ai_rev_recovery_rate, 2),
@@ -383,6 +433,7 @@ class RecoveryOrchestrator:
         # 2. Baseline 1: Blind Retries
         baseline_recovered_payments = [p for p in payments if p.baseline_status == "RECOVERED"]
         baseline_recovered_revenue = sum(p.baseline_recovered_amount for p in baseline_recovered_payments)
+        baseline_fraud_loss = sum(p.baseline_fraud_loss_prevented for p in payments)
         baseline_intervention_cost = sum(p.baseline_intervention_cost for p in payments)
         baseline_net_revenue = baseline_recovered_revenue - baseline_intervention_cost
         
@@ -398,6 +449,7 @@ class RecoveryOrchestrator:
             description="Naive Baseline — blind retry strategy without diagnosis, economic valuation, or policy guardrails.",
             total_revenue_at_risk=round(total_revenue_at_risk, 2),
             total_recovered_revenue=round(baseline_recovered_revenue, 2),
+            total_fraud_loss_prevented=round(baseline_fraud_loss, 2),
             total_intervention_cost=round(baseline_intervention_cost, 2),
             total_net_recovered_revenue=round(baseline_net_revenue, 2),
             revenue_recovery_rate_pct=round(baseline_rev_recovery_rate, 2),
@@ -415,6 +467,7 @@ class RecoveryOrchestrator:
         # 3. Baseline 2: Simple Rule-Based
         rule_recovered_payments = [p for p in payments if p.rule_baseline_status == "RECOVERED"]
         rule_recovered_revenue = sum(p.rule_baseline_recovered_amount for p in rule_recovered_payments)
+        rule_fraud_loss = sum(p.rule_baseline_fraud_loss_prevented for p in payments)
         rule_intervention_cost = sum(p.rule_baseline_intervention_cost for p in payments)
         rule_net_revenue = rule_recovered_revenue - rule_intervention_cost
         
@@ -424,13 +477,14 @@ class RecoveryOrchestrator:
         
         rule_total_retries = sum(p.rule_baseline_retries for p in payments)
         rule_unnecessary_retries = sum(p.rule_baseline_retries for p in payments if p.rule_baseline_status != "RECOVERED")
-        rule_fraud_blocks = sum(1 for p in payments if p.error_code == "SUSPECTED_FRAUD" and p.rule_baseline_action == "NO_ACTION")
+        rule_fraud_blocks = sum(1 for p in payments if p.rule_baseline_status == "FRAUD_BLOCKED" or (p.error_code == "SUSPECTED_FRAUD" and p.rule_baseline_action == "NO_ACTION"))
 
         rule_metrics = StrategyMetrics(
             name="Simple Rule-Based Baseline",
             description="Static deterministic rules without contextual AI root-cause diagnosis, tier adaptation, or economic valuation.",
             total_revenue_at_risk=round(total_revenue_at_risk, 2),
             total_recovered_revenue=round(rule_recovered_revenue, 2),
+            total_fraud_loss_prevented=round(rule_fraud_loss, 2),
             total_intervention_cost=round(rule_intervention_cost, 2),
             total_net_recovered_revenue=round(rule_net_revenue, 2),
             revenue_recovery_rate_pct=round(rule_rev_recovery_rate, 2),
@@ -445,17 +499,18 @@ class RecoveryOrchestrator:
             escalations_count=0
         )
 
-        uplift_revenue = round(max(0.0, ai_recovered_revenue - baseline_recovered_revenue), 2)
-        uplift_net_revenue = round(max(0.0, ai_net_recovered_revenue - baseline_net_revenue), 2)
-        uplift_rate_pct = round(max(0.0, ai_tx_recovery_rate - baseline_tx_recovery_rate), 2)
-        uplift_revenue_rate_pct = round(max(0.0, ai_rev_recovery_rate - baseline_rev_recovery_rate), 2)
+        # Honest Uplift Calculations — No artificial max(0.0, ...) clamping (Phase 8 fix)
+        uplift_revenue = round(ai_recovered_revenue - baseline_recovered_revenue, 2)
+        uplift_net_revenue = round(ai_net_recovered_revenue - baseline_net_revenue, 2)
+        uplift_rate_pct = round(ai_tx_recovery_rate - baseline_tx_recovery_rate, 2)
+        uplift_revenue_rate_pct = round(ai_rev_recovery_rate - baseline_rev_recovery_rate, 2)
         
-        uplift_over_rule_rev = round(max(0.0, ai_recovered_revenue - rule_recovered_revenue), 2)
-        uplift_over_rule_net_rev = round(max(0.0, ai_net_recovered_revenue - rule_net_revenue), 2)
-        uplift_over_rule_rate = round(max(0.0, ai_tx_recovery_rate - rule_tx_recovery_rate), 2)
-        uplift_over_rule_rev_rate = round(max(0.0, ai_rev_recovery_rate - rule_rev_recovery_rate), 2)
+        uplift_over_rule_rev = round(ai_recovered_revenue - rule_recovered_revenue, 2)
+        uplift_over_rule_net_rev = round(ai_net_recovered_revenue - rule_net_revenue, 2)
+        uplift_over_rule_rate = round(ai_tx_recovery_rate - rule_tx_recovery_rate, 2)
+        uplift_over_rule_rev_rate = round(ai_rev_recovery_rate - rule_rev_recovery_rate, 2)
         
-        retries_saved = max(0, baseline_total_retries - ai_retries_executed)
+        retries_saved = baseline_total_retries - ai_retries_executed
         customer_fatigue_prevented = baseline_unnecessary_retries
 
         return ComparisonSummary(
@@ -482,8 +537,10 @@ class RecoveryOrchestrator:
         payments = db.query(PaymentRecord).all()
         total_records = len(payments)
         revenue_at_risk = sum(p.amount for p in payments)
+        payment_ids = [p.id for p in payments]
         
         ai_recovered = sum(p.recovered_amount for p in payments if p.status == "RECOVERED")
+        ai_fraud_loss = sum(p.fraud_loss_prevented for p in payments)
         ai_cost = sum(p.intervention_cost for p in payments)
         ai_net = ai_recovered - ai_cost
         ai_count = sum(1 for p in payments if p.status == "RECOVERED")
@@ -491,6 +548,7 @@ class RecoveryOrchestrator:
         ai_tx_rate = (ai_count / total_records * 100) if total_records > 0 else 0.0
 
         base_recovered = sum(p.baseline_recovered_amount for p in payments if p.baseline_status == "RECOVERED")
+        base_fraud_loss = sum(p.baseline_fraud_loss_prevented for p in payments)
         base_cost = sum(p.baseline_intervention_cost for p in payments)
         base_net = base_recovered - base_cost
         base_count = sum(1 for p in payments if p.baseline_status == "RECOVERED")
@@ -498,6 +556,7 @@ class RecoveryOrchestrator:
         base_tx_rate = (base_count / total_records * 100) if total_records > 0 else 0.0
 
         rule_recovered = sum(p.rule_baseline_recovered_amount for p in payments if p.rule_baseline_status == "RECOVERED")
+        rule_fraud_loss = sum(p.rule_baseline_fraud_loss_prevented for p in payments)
         rule_cost = sum(p.rule_baseline_intervention_cost for p in payments)
         rule_net = rule_recovered - rule_cost
         rule_count = sum(1 for p in payments if p.rule_baseline_status == "RECOVERED")
@@ -517,20 +576,37 @@ class RecoveryOrchestrator:
             action_key = p.recovery_action_taken or "PENDING"
             action_dist[action_key] = action_dist.get(action_key, 0) + 1
 
-        override_count = db.query(AuditLog).filter(AuditLog.policy_override == True).count()
+        # Calculate run-isolated override count
+        override_count = 0
+        if payment_ids:
+            latest_audits = (
+                db.query(AuditLog)
+                .filter(AuditLog.payment_id.in_(payment_ids))
+                .order_by(AuditLog.id.desc())
+                .all()
+            )
+            seen_p: Set[int] = set()
+            for audit in latest_audits:
+                if audit.payment_id not in seen_p:
+                    seen_p.add(audit.payment_id)
+                    if audit.policy_override and not audit.duplicate_blocked:
+                        override_count += 1
 
         return SystemOverview(
             total_records=total_records,
             revenue_at_risk=round(revenue_at_risk, 2),
             recovered_revenue_ai=round(ai_recovered, 2),
+            fraud_loss_prevented_ai=round(ai_fraud_loss, 2),
             net_recovered_revenue_ai=round(ai_net, 2),
             revenue_recovery_rate_ai=round(ai_rev_rate, 2),
             transaction_recovery_rate_ai=round(ai_tx_rate, 2),
             recovered_revenue_baseline=round(base_recovered, 2),
+            fraud_loss_prevented_baseline=round(base_fraud_loss, 2),
             net_recovered_revenue_baseline=round(base_net, 2),
             revenue_recovery_rate_baseline=round(base_rev_rate, 2),
             transaction_recovery_rate_baseline=round(base_tx_rate, 2),
             recovered_revenue_rule_baseline=round(rule_recovered, 2),
+            fraud_loss_prevented_rule_baseline=round(rule_fraud_loss, 2),
             net_recovered_revenue_rule_baseline=round(rule_net, 2),
             revenue_recovery_rate_rule_baseline=round(rule_rev_rate, 2),
             transaction_recovery_rate_rule_baseline=round(rule_tx_rate, 2),
@@ -550,7 +626,7 @@ class RecoveryOrchestrator:
     ) -> MultiSeedEvaluationResult:
         """
         Executes 20-seed robustness evaluation across seeds 1..20 to measure economic stability
-        across pseudo-random datasets.
+        across pseudo-random datasets under synthetic simulation assumptions.
         """
         seeds = list(range(seed_start, seed_end + 1))
         per_seed_results = []
@@ -577,12 +653,15 @@ class RecoveryOrchestrator:
             records = generate_synthetic_payments(count=count_per_seed, seed=s)
             total_risk = sum(r.amount for r in records)
 
-            # 1. RecoverAI Simulation
+            # 1. RecoverAI Simulation (Risk -> LLM -> Candidate Economics -> Policy Engine Validation -> Simulation Outcome)
             ai_gross = 0.0
             ai_cost = 0.0
             ai_count = 0
             for r in records:
-                diag, _ = LLMService.diagnose_payment(r)
+                risk_prof = RiskEngine.evaluate_risk(r)
+                diag, _ = LLMService.diagnose_payment(r, risk_profile=risk_prof)
+                policy_checks = PolicyEngine.evaluate_candidate_eligibility(r)
+                economic_eval = SimulationEngine.evaluate_action_economics(r, policy_checks, diagnosis=diag)
                 policy_res = PolicyEngine.evaluate(r, diag)
                 sim_res = SimulationEngine.simulate_ai_recovery(r, policy_res.approved_action, seed_offset=s)
                 ai_cost += sim_res.intervention_cost

@@ -37,19 +37,23 @@ def get_payment(payment_id: int, db: Session = Depends(get_db)):
     return payment
 
 @router.post("/reset")
-def reset_synthetic_dataset(db: Session = Depends(get_db)):
-    """Wipes existing payments, audit logs, & processed idempotency events, and creates a fresh batch of 100 synthetic records."""
+def reset_synthetic_dataset(
+    seed: int = Query(42, description="Seed for reproducible synthetic dataset generation"),
+    db: Session = Depends(get_db)
+):
+    """Wipes existing payments, audit logs, & processed idempotency events, and creates a fresh batch of 100 synthetic records with the specified seed."""
     db.query(ProcessedEvent).delete()
     db.query(AuditLog).delete()
     db.query(PaymentRecord).delete()
     db.commit()
 
-    records = generate_synthetic_payments(count=100, seed=42)
+    records = generate_synthetic_payments(count=100, seed=seed)
     db.add_all(records)
     db.commit()
 
     return {
-        "message": "Successfully generated 100 fresh synthetic failed-payment records",
+        "message": f"Successfully generated {len(records)} fresh synthetic failed-payment records with seed {seed}",
+        "seed": seed,
         "count": len(records),
-        "total_revenue_at_risk": sum(r.amount for r in records)
+        "total_revenue_at_risk": round(sum(r.amount for r in records), 2)
     }

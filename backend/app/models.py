@@ -28,6 +28,7 @@ class PaymentRecord(Base):
     # 1. RecoverAI Execution Results
     recovery_action_taken = Column(String(32), nullable=True) # RETRY, ALTERNATE_PAYMENT, REMINDER, ESCALATE, NO_ACTION
     recovered_amount = Column(Float, default=0.0)             # Gross recovered
+    fraud_loss_prevented = Column(Float, default=0.0)         # Prevented fraud loss (when fraud blocked)
     intervention_cost = Column(Float, default=0.0)            # Synthetic cost incurred
     net_recovered_amount = Column(Float, default=0.0)         # Net = Gross - Cost
     
@@ -35,14 +36,16 @@ class PaymentRecord(Base):
     baseline_status = Column(String(32), nullable=True) # RECOVERED, PERMANENTLY_FAILED
     baseline_retries = Column(Integer, default=0)
     baseline_recovered_amount = Column(Float, default=0.0)
+    baseline_fraud_loss_prevented = Column(Float, default=0.0)
     baseline_intervention_cost = Column(Float, default=0.0)
     baseline_net_recovered_amount = Column(Float, default=0.0)
 
     # 3. Baseline 2: Simple Rule-Based Recovery Simulation Results
-    rule_baseline_status = Column(String(32), nullable=True) # RECOVERED, FAILED
+    rule_baseline_status = Column(String(32), nullable=True) # RECOVERED, FAILED, FRAUD_BLOCKED
     rule_baseline_action = Column(String(32), nullable=True) # RETRY, ALTERNATE_PAYMENT, REMINDER, ESCALATE, NO_ACTION
     rule_baseline_retries = Column(Integer, default=0)
     rule_baseline_recovered_amount = Column(Float, default=0.0)
+    rule_baseline_fraud_loss_prevented = Column(Float, default=0.0)
     rule_baseline_intervention_cost = Column(Float, default=0.0)
     rule_baseline_net_recovered_amount = Column(Float, default=0.0)
 
@@ -60,6 +63,7 @@ class ProcessedEvent(Base):
     action_approved = Column(String(32), nullable=False)
     simulation_status = Column(String(32), nullable=False)
     recovered_amount = Column(Float, default=0.0)
+    fraud_loss_prevented = Column(Float, default=0.0)
     intervention_cost = Column(Float, default=0.0)
     net_recovered_amount = Column(Float, default=0.0)
     response_json = Column(Text, nullable=True)
@@ -83,9 +87,10 @@ class AuditLog(Base):
     policy_override = Column(Boolean, default=False)
     policy_override_reason = Column(Text, nullable=True)
     
-    simulation_status = Column(String(32), nullable=False) # RECOVERED, FAILED, ESCALATED, BLOCKED, DUPLICATE_BLOCKED
+    simulation_status = Column(String(32), nullable=False) # RECOVERED, FAILED, ESCALATED, FRAUD_BLOCKED, DUPLICATE_BLOCKED
     simulated_probability = Column(Float, default=0.0)
     recovered_amount = Column(Float, default=0.0)          # Gross recovered
+    fraud_loss_prevented = Column(Float, default=0.0)      # Prevented fraud loss
     intervention_cost = Column(Float, default=0.0)         # Synthetic action cost
     net_recovered_amount = Column(Float, default=0.0)      # Net = Gross - Cost
     

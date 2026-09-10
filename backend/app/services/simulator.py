@@ -134,11 +134,12 @@ class SimulationEngine:
     def evaluate_action_economics(
         cls, 
         payment: PaymentRecord, 
-        policy_checks: Dict[str, Tuple[bool, Optional[str]]]
+        policy_checks: Dict[str, Tuple[bool, Optional[str]]],
+        diagnosis: Optional[Any] = None
     ) -> EconomicEvaluationResult:
         """
         Calculates Expected Gross Recovery, Intervention Cost, and Expected Net Recovery
-        for all 5 candidate actions to evaluate the economic trade-offs.
+        for all 5 candidate actions to evaluate the economic trade-offs under synthetic simulation assumptions.
         """
         candidate_actions: List[ActionEconomics] = []
         
@@ -161,28 +162,40 @@ class SimulationEngine:
                 policy_notes=policy_note
             ))
 
-        # Find economically optimal allowed action
+        # Find economically optimal policy-allowed action
         allowed_actions = [a for a in candidate_actions if a.is_policy_eligible]
         if allowed_actions:
             optimal = max(allowed_actions, key=lambda a: a.expected_net_recovery)
             optimal_action = optimal.action
             optimal_net = optimal.expected_net_recovery
+            optimal_prob = optimal.success_probability
         else:
             optimal_action = RecoveryActionEnum.ESCALATE.value
             optimal_net = 0.0
+            optimal_prob = cls.get_action_probability(payment, optimal_action)
 
-        # Construct explanation
+        # Construct explanation referencing optimal action's actual probability (Phase 4 fix)
         why_text = f"Evaluated 5 candidate actions for ₹{payment.amount:,.2f} at-risk on {payment.error_code}. "
         if optimal_action == RecoveryActionEnum.NO_ACTION.value and payment.error_code == "SUSPECTED_FRAUD":
             why_text += "Zero-tolerance fraud protection mandates NO_ACTION to prevent chargeback loss."
         elif optimal_action != RecoveryActionEnum.RETRY.value and payment.retry_count >= 3:
-            why_text += f"Retry budget exhausted ({payment.retry_count}/3). {optimal_action} delivers optimal net recovery of ₹{optimal_net:,.2f}."
+            why_text += f"Retry budget exhausted ({payment.retry_count}/3). {optimal_action} delivers optimal expected net recovery of ₹{optimal_net:,.2f} at an estimated success probability of {optimal_prob:.0%}."
         else:
-            why_text += f"{optimal_action} yields highest expected net recovery of ₹{optimal_net:,.2f} (prob {candidate_actions[0].success_probability:.0%})."
+            why_text += f"{optimal_action} yields highest expected net recovery of ₹{optimal_net:,.2f} at an estimated success probability of {optimal_prob:.0%}."
+
+        # Determine recommended action baseline for comparison
+        if diagnosis and hasattr(diagnosis, "recommended_action"):
+            rec_val = diagnosis.recommended_action.value if hasattr(diagnosis.recommended_action, "value") else str(diagnosis.recommended_action)
+            matching_rec = next((a for a in candidate_actions if a.action == rec_val), candidate_actions[0])
+            rec_action = matching_rec.action
+            rec_net = matching_rec.expected_net_recovery
+        else:
+            rec_action = candidate_actions[0].action
+            rec_net = candidate_actions[0].expected_net_recovery
 
         return EconomicEvaluationResult(
-            recommended_action=candidate_actions[0].action,
-            recommended_expected_net=candidate_actions[0].expected_net_recovery,
+            recommended_action=rec_action,
+            recommended_expected_net=rec_net,
             optimal_economic_action=optimal_action,
             optimal_expected_net=optimal_net,
             why_this_action=why_text,
@@ -198,6 +211,7 @@ class SimulationEngine:
     ) -> SimulationOutcome:
         """
         Simulates outcome of executing the policy-approved action for RecoverAI using stable SHA-256 seed.
+        Under synthetic simulation assumptions, cleanly distinguishes gross revenue recovered from fraud loss prevented.
         """
         # SHA-256 stable seed across Python processes
         seed_key = f"{payment.transaction_id}_{approved_action.value}_{seed_offset}"
@@ -206,22 +220,24 @@ class SimulationEngine:
         
         intervention_cost = INTERVENTION_COSTS.get(approved_action.value, 0.0)
         
-        # Fraud protection special handling
+        # Fraud protection special handling (Phase 6: fraud loss prevented accounting)
         if payment.error_code == "SUSPECTED_FRAUD":
             if approved_action in [RecoveryActionEnum.NO_ACTION, RecoveryActionEnum.ESCALATE]:
                 return SimulationOutcome(
-                    status="RECOVERED", # Fraud successfully contained/blocked
+                    status="FRAUD_BLOCKED",
                     simulated_probability=1.0,
-                    recovered_amount=0.0, # Fraud blocked - ₹0 captured, fraud loss prevented
+                    recovered_amount=0.0,
+                    fraud_loss_prevented=payment.amount,
                     intervention_cost=intervention_cost,
                     net_recovered_amount=round(-intervention_cost, 2),
-                    notes="Fraud safely contained. Zero chargeback liability incurred."
+                    notes=f"Suspected fraud safely blocked. Fraud loss of ₹{payment.amount:,.2f} prevented with zero chargeback liability."
                 )
             else:
                 return SimulationOutcome(
                     status="FAILED",
                     simulated_probability=0.0,
                     recovered_amount=0.0,
+                    fraud_loss_prevented=0.0,
                     intervention_cost=intervention_cost,
                     net_recovered_amount=round(-intervention_cost, 2),
                     notes="Fraudulent transaction failed."
@@ -238,6 +254,7 @@ class SimulationEngine:
                 status="RECOVERED",
                 simulated_probability=prob,
                 recovered_amount=gross,
+                fraud_loss_prevented=0.0,
                 intervention_cost=intervention_cost,
                 net_recovered_amount=net,
                 notes=f"Recovery successful via action '{approved_action.value}' (prob {prob:.0%}, net ₹{net:,.2f})."
@@ -247,6 +264,7 @@ class SimulationEngine:
                 status="FAILED",
                 simulated_probability=prob,
                 recovered_amount=0.0,
+                fraud_loss_prevented=0.0,
                 intervention_cost=intervention_cost,
                 net_recovered_amount=round(-intervention_cost, 2),
                 notes=f"Recovery attempt with '{approved_action.value}' was unsuccessful (cost ₹{intervention_cost:,.2f})."
@@ -263,17 +281,19 @@ class SimulationEngine:
         rng = random.Random(seed_val)
         
         prob = BASELINE_BLIND_RETRY_PROBABILITIES.get(payment.error_code, 0.15)
-        is_success = rng.random() < prob
+        is_success = rng.random() < prob if payment.error_code != "SUSPECTED_FRAUD" else False
         
         retries_executed = rng.randint(1, 2) if is_success else 3
         # Incur ₹20 retry fee for every blind attempt
         intervention_cost = retries_executed * INTERVENTION_COSTS[RecoveryActionEnum.RETRY.value]
         recovered_amount = payment.amount if is_success else 0.0
+        fraud_loss_prevented = 0.0
         net_recovered = round(recovered_amount - intervention_cost, 2)
         
         return {
             "status": "RECOVERED" if is_success else "PERMANENTLY_FAILED",
             "recovered_amount": recovered_amount,
+            "fraud_loss_prevented": fraud_loss_prevented,
             "intervention_cost": intervention_cost,
             "net_recovered_amount": net_recovered,
             "retries_executed": retries_executed,
@@ -302,6 +322,7 @@ class SimulationEngine:
                 "status": "FAILED",
                 "action": action,
                 "recovered_amount": 0.0,
+                "fraud_loss_prevented": 0.0,
                 "intervention_cost": 0.0,
                 "net_recovered_amount": 0.0,
                 "retries_executed": 0,
@@ -311,9 +332,10 @@ class SimulationEngine:
             
         if payment.error_code == "SUSPECTED_FRAUD":
             return {
-                "status": "RECOVERED", # Contained
+                "status": "FRAUD_BLOCKED",
                 "action": RecoveryActionEnum.NO_ACTION.value,
                 "recovered_amount": 0.0,
+                "fraud_loss_prevented": payment.amount,
                 "intervention_cost": 0.0,
                 "net_recovered_amount": 0.0,
                 "retries_executed": 0,
@@ -325,12 +347,14 @@ class SimulationEngine:
         is_success = rng.random() < prob
         retries_executed = 1 if action == RecoveryActionEnum.RETRY.value else 0
         recovered_amount = payment.amount if is_success else 0.0
+        fraud_loss_prevented = 0.0
         net_recovered = round(recovered_amount - intervention_cost, 2)
 
         return {
             "status": "RECOVERED" if is_success else "FAILED",
             "action": action,
             "recovered_amount": recovered_amount,
+            "fraud_loss_prevented": fraud_loss_prevented,
             "intervention_cost": intervention_cost,
             "net_recovered_amount": net_recovered,
             "retries_executed": retries_executed,

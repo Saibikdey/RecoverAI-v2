@@ -401,3 +401,210 @@ def test_api_endpoints_including_seed_reset():
     r_multi = client.get("/api/recovery/multi-seed-evaluation?seed_start=1&seed_end=3")
     assert r_multi.status_code == 200
     assert r_multi.json()["seed_count"] == 3
+
+# 14. Risk Engine Multi-Factor Assessment Test
+def test_risk_engine_structured_assessment():
+    # Test High-Value Enterprise fraud payment
+    p_fraud = PaymentRecord(
+        transaction_id="tx_risk_fraud",
+        customer_id="cust_ent",
+        customer_name="Enterprise Corp",
+        customer_tier="ENTERPRISE",
+        amount=120000.0,
+        currency="INR",
+        payment_method="CREDIT_CARD",
+        error_code="SUSPECTED_FRAUD",
+        error_message="IP velocity mismatch",
+        status="FAILED",
+        retry_count=0
+    )
+    risk_fraud = RiskEngine.evaluate_risk(p_fraud)
+    assert risk_fraud.security_risk == "CRITICAL"
+    assert risk_fraud.urgency == "CRITICAL"
+    assert risk_fraud.financial_exposure == 120000.0
+    assert risk_fraud.recovery_feasibility == 0.0
+    assert risk_fraud.risk_level == "CRITICAL"
+    assert len(risk_fraud.key_risk_factors) > 0
+
+    # Test Standard transient network timeout
+    p_net = PaymentRecord(
+        transaction_id="tx_risk_net",
+        customer_id="cust_std",
+        customer_name="Standard User",
+        customer_tier="STANDARD",
+        amount=2500.0,
+        currency="INR",
+        payment_method="UPI",
+        error_code="NETWORK_TIMEOUT",
+        error_message="Gateway timeout",
+        status="FAILED",
+        retry_count=0
+    )
+    risk_net = RiskEngine.evaluate_risk(p_net)
+    assert risk_net.security_risk == "LOW"
+    assert risk_net.urgency == "HIGH"
+    assert risk_net.recovery_feasibility >= 0.85
+    assert risk_net.customer_fatigue_risk == "LOW"
+
+# 15. Fraud Accounting: Loss Prevented vs Revenue Recovered Test
+def test_fraud_accounting_loss_prevented_vs_recovered():
+    db = TestingSessionLocal()
+    p_fraud = PaymentRecord(
+        transaction_id="tx_fraud_acct_01",
+        customer_id="cust_fraud",
+        customer_name="Fraudster X",
+        customer_tier="STANDARD",
+        amount=60000.0,
+        currency="INR",
+        payment_method="CREDIT_CARD",
+        error_code="SUSPECTED_FRAUD",
+        error_message="Fraud anomaly",
+        status="FAILED",
+        retry_count=0
+    )
+    db.add(p_fraud)
+    db.commit()
+    db.refresh(p_fraud)
+
+    res = RecoveryOrchestrator.process_single_payment(p_fraud, db, event_id="evt_fraud_test_999")
+    
+    # Verify Policy Engine forced NO_ACTION
+    assert res.policy_evaluation.approved_action == RecoveryActionEnum.NO_ACTION
+    # Verify Simulation Outcome sets FRAUD_BLOCKED
+    assert res.simulation_outcome.status == "FRAUD_BLOCKED"
+    # Revenue recovered must be ₹0, not ₹60,000
+    assert res.simulation_outcome.recovered_amount == 0.0
+    # Fraud loss prevented must be ₹60,000
+    assert res.simulation_outcome.fraud_loss_prevented == 60000.0
+    assert res.simulation_outcome.net_recovered_amount == 0.0
+    # Payment record updated correctly
+    assert p_fraud.status == "FRAUD_BLOCKED"
+    assert p_fraud.recovered_amount == 0.0
+    assert p_fraud.fraud_loss_prevented == 60000.0
+    db.close()
+
+# 16. Economic Explanation Uses Correct Optimal Action Probability Test
+def test_economic_explanation_uses_correct_action_probability():
+    p_expired = PaymentRecord(
+        transaction_id="tx_exp_prob_test",
+        customer_id="cust_exp",
+        customer_name="Exp Cardholder",
+        customer_tier="STANDARD",
+        amount=10000.0,
+        currency="INR",
+        payment_method="CREDIT_CARD",
+        error_code="CARD_EXPIRED",
+        error_message="Card validity expired",
+        status="FAILED",
+        retry_count=0
+    )
+    policy_checks = PolicyEngine.evaluate_candidate_eligibility(p_expired)
+    econ = SimulationEngine.evaluate_action_economics(p_expired, policy_checks)
+
+    # Optimal action for CARD_EXPIRED is ALTERNATE_PAYMENT (prob 84%)
+    assert econ.optimal_economic_action == RecoveryActionEnum.ALTERNATE_PAYMENT.value
+    # Ensure explanation references 84% probability, NOT RETRY's 0%
+    assert "84%" in econ.why_this_action
+    assert "ALTERNATE_PAYMENT" in econ.why_this_action
+
+# 17. Unauthorized Action Whitelist Security Block Test
+def test_unauthorized_action_blocked_and_escalated():
+    payment = PaymentRecord(
+        transaction_id="tx_unauth_test",
+        customer_id="cust_1",
+        customer_name="Test User",
+        customer_tier="STANDARD",
+        amount=5000.0,
+        currency="INR",
+        payment_method="UPI",
+        error_code="BANK_SERVER_DOWN",
+        error_message="Outage",
+        status="FAILED",
+        retry_count=0
+    )
+    # LLM outputs an unauthorized action string
+    invalid_diag = LLMDiagnosisOutput(
+        root_cause_diagnosis="Unknown reason",
+        confidence=0.9,
+        recommended_action=RecoveryActionEnum.NO_ACTION, # valid enum for schema
+        rationale="Invalid external action"
+    )
+    # Simulate direct unauthorized action object
+    invalid_diag.recommended_action = "CHARGE_BACK_IMMEDIATELY"
+    
+    policy_res = PolicyEngine.evaluate(payment, invalid_diag)
+    assert policy_res.is_overridden is True
+    assert policy_res.approved_action == RecoveryActionEnum.ESCALATE
+    assert "RULE_UNAUTHORIZED_ACTION_BLOCK" in policy_res.applied_rules
+    assert policy_res.is_safe is False
+
+# 18. Malformed LLM Response & API Error Safe Fallback Test
+def test_malformed_llm_response_safe_fallback():
+    payment = PaymentRecord(
+        transaction_id="tx_fallback_test",
+        customer_id="cust_fall",
+        customer_name="Fallback User",
+        customer_tier="STANDARD",
+        amount=4500.0,
+        currency="INR",
+        payment_method="UPI",
+        error_code="BANK_SERVER_DOWN",
+        error_message="Switch down",
+        status="FAILED",
+        retry_count=0
+    )
+    # Test deterministic fallback directly
+    fallback_diag = LLMService._deterministic_fallback_diagnosis(payment)
+    assert isinstance(fallback_diag, LLMDiagnosisOutput)
+    assert fallback_diag.recommended_action == RecoveryActionEnum.RETRY
+    assert len(fallback_diag.key_factors) > 0
+    assert fallback_diag.confidence >= 0.8
+
+# 19. Honest Uplift Calculations (No max(0, ..) clipping) Test
+def test_uplift_calculation_honest_non_clamped():
+    db = TestingSessionLocal()
+    # Populate DB and run simulations
+    RecoveryOrchestrator.run_batch_ai_recovery(db)
+    RecoveryOrchestrator.run_baseline_simulation(db)
+    RecoveryOrchestrator.run_rule_based_simulation(db)
+
+    summary = RecoveryOrchestrator.get_comparison_summary(db)
+    # Uplifts must be mathematically equal to difference, positive or negative
+    expected_net_uplift = round(summary.ai_strategy.total_net_recovered_revenue - summary.baseline_strategy.total_net_recovered_revenue, 2)
+    assert summary.uplift_net_revenue == expected_net_uplift
+
+    expected_rule_net_uplift = round(summary.ai_strategy.total_net_recovered_revenue - summary.rule_baseline_strategy.total_net_recovered_revenue, 2)
+    assert summary.uplift_over_rule_net_revenue == expected_rule_net_uplift
+    db.close()
+
+# 20. End-to-End Decision Flow & Risk Profile Propagation Test
+def test_end_to_end_decision_flow_and_risk_profile():
+    db = TestingSessionLocal()
+    payment = db.query(PaymentRecord).filter(PaymentRecord.error_code == "LIMIT_EXCEEDED").first()
+    if not payment:
+        payment = PaymentRecord(
+            transaction_id="tx_flow_01",
+            customer_id="cust_flow",
+            customer_name="Flow User",
+            customer_tier="VIP",
+            amount=75000.0,
+            currency="INR",
+            payment_method="CREDIT_CARD",
+            error_code="LIMIT_EXCEEDED",
+            error_message="Card limit exceeded",
+            status="FAILED",
+            retry_count=0
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+    res = RecoveryOrchestrator.process_single_payment(payment, db)
+    assert res.risk_profile is not None
+    assert res.risk_profile.financial_exposure == payment.amount
+    assert res.economic_evaluation is not None
+    assert res.economic_evaluation.optimal_economic_action is not None
+    assert res.policy_evaluation is not None
+    assert res.simulation_outcome is not None
+    assert res.simulation_outcome.status in ["RECOVERED", "FAILED", "FRAUD_BLOCKED", "ESCALATED"]
+    db.close()

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Tuple, Optional
 from app.config import settings
 from app.schemas import RecoveryActionEnum, LLMDiagnosisOutput, PolicyEvaluationResult
 from app.models import PaymentRecord
@@ -22,6 +22,46 @@ class PolicyEngine:
     """
 
     @classmethod
+    def evaluate_candidate_eligibility(cls, payment: PaymentRecord) -> Dict[str, Tuple[bool, Optional[str]]]:
+        """
+        Determines policy eligibility and constraint notes for all candidate actions
+        prior to economic evaluation.
+        """
+        eligibility: Dict[str, Tuple[bool, Optional[str]]] = {}
+        
+        for action in ALLOWED_ACTIONS:
+            act_str = action.value
+            
+            # Guard 1: Fraud Zero-Tolerance
+            if payment.error_code == "SUSPECTED_FRAUD":
+                if act_str in [RecoveryActionEnum.RETRY.value, RecoveryActionEnum.REMINDER.value, RecoveryActionEnum.ALTERNATE_PAYMENT.value]:
+                    eligibility[act_str] = (False, "Zero-tolerance fraud policy strictly prohibits automated retries and notifications")
+                    continue
+                else:
+                    eligibility[act_str] = (True, "Permitted fraud containment action")
+                    continue
+
+            # Guard 2: Expired Card
+            if payment.error_code == "CARD_EXPIRED" and act_str == RecoveryActionEnum.RETRY.value:
+                eligibility[act_str] = (False, "Permanent card expiry cannot be retried on existing instrument")
+                continue
+
+            # Guard 3: Maximum Retries Budget
+            if act_str == RecoveryActionEnum.RETRY.value and payment.retry_count >= settings.MAX_RETRIES:
+                eligibility[act_str] = (False, f"Max retry limit exhausted ({payment.retry_count}/{settings.MAX_RETRIES})")
+                continue
+
+            # Guard 5: High Value / VIP on complex decline
+            if (payment.amount >= settings.HIGH_VALUE_THRESHOLD_INR or payment.customer_tier in ["VIP", "ENTERPRISE"]):
+                if payment.error_code in ["LIMIT_EXCEEDED", "DO_NOT_HONOR"] and act_str == RecoveryActionEnum.RETRY.value:
+                    eligibility[act_str] = (False, "High-value/VIP policy requires human escalation over automated retry")
+                    continue
+
+            eligibility[act_str] = (True, None)
+
+        return eligibility
+
+    @classmethod
     def evaluate(cls, payment: PaymentRecord, diagnosis: LLMDiagnosisOutput) -> PolicyEvaluationResult:
         recommended = diagnosis.recommended_action
         applied_rules: List[str] = []
@@ -30,13 +70,13 @@ class PolicyEngine:
         approved_action = recommended
 
         # Guardrail 0: Action Whitelist Verification
-        if recommended not in ALLOWED_ACTIONS:
+        if approved_action not in ALLOWED_ACTIONS:
             is_overridden = True
             approved_action = RecoveryActionEnum.ESCALATE
             override_reason = f"Security Violation: LLM produced unauthorized action '{recommended}'. Overriding to ESCALATE."
             applied_rules.append("RULE_UNAUTHORIZED_ACTION_BLOCK")
             return PolicyEvaluationResult(
-                recommended_action=recommended,
+                recommended_action=str(recommended),
                 approved_action=approved_action,
                 is_overridden=is_overridden,
                 override_reason=override_reason,
@@ -45,12 +85,12 @@ class PolicyEngine:
             )
         applied_rules.append("RULE_ACTION_WHITELIST_VALIDATED")
 
-        # Guardrail 1: Fraud & Security Safety Guard
+        # Guardrail 1: Fraud & Security Safety Guard (Zero-Tolerance)
         if payment.error_code == "SUSPECTED_FRAUD":
-            if recommended in [RecoveryActionEnum.RETRY, RecoveryActionEnum.REMINDER]:
+            if approved_action in [RecoveryActionEnum.RETRY, RecoveryActionEnum.REMINDER, RecoveryActionEnum.ALTERNATE_PAYMENT]:
                 is_overridden = True
                 approved_action = RecoveryActionEnum.NO_ACTION
-                override_reason = "Fraud Safety Guard: Retries and reminders are strictly prohibited on suspected fraud to prevent chargeback loss."
+                override_reason = "Fraud Safety Guard: Retries and customer reminders are strictly prohibited on suspected fraud to prevent chargeback loss."
                 applied_rules.append("RULE_FRAUD_ZERO_TOLERANCE_OVERRIDE")
             else:
                 applied_rules.append("RULE_FRAUD_SAFE_ACTION_CONFIRMED")
@@ -101,7 +141,7 @@ class PolicyEngine:
                 applied_rules.append("RULE_HIGH_VALUE_VERIFIED")
 
         return PolicyEvaluationResult(
-            recommended_action=recommended,
+            recommended_action=str(recommended.value if hasattr(recommended, "value") else recommended),
             approved_action=approved_action,
             is_overridden=is_overridden,
             override_reason=override_reason,

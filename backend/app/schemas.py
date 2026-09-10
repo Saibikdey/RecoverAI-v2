@@ -27,12 +27,23 @@ class PaymentStatusEnum(str, Enum):
     PERMANENTLY_FAILED = "PERMANENTLY_FAILED"
     IN_PROGRESS = "IN_PROGRESS"
 
+class RiskProfile(BaseModel):
+    risk_score: float = Field(ge=0.0, le=1.0, description="Composite risk score between 0.0 and 1.0")
+    risk_level: str = Field(description="Risk categorization: LOW, MEDIUM, HIGH, CRITICAL")
+    recovery_feasibility: float = Field(ge=0.0, le=1.0, description="Estimated feasibility of successful recovery")
+    urgency: str = Field(description="Operational urgency level: LOW, MEDIUM, HIGH, CRITICAL")
+    customer_fatigue_risk: str = Field(description="Risk of customer churn / fatigue from multiple touchpoints")
+    financial_exposure: float = Field(description="Direct financial exposure / transaction amount in INR")
+    security_risk: str = Field(description="Fraud and security anomaly risk level")
+    key_risk_factors: List[str] = Field(default_factory=list, description="Key deterministic risk drivers identified")
+
 # Structured LLM Output Schema (Advisory Only)
 class LLMDiagnosisOutput(BaseModel):
     root_cause_diagnosis: str = Field(description="Contextual root cause analysis of why the payment failed")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score between 0.0 and 1.0")
     recommended_action: RecoveryActionEnum = Field(description="Action recommendation: RETRY, ALTERNATE_PAYMENT, REMINDER, ESCALATE, or NO_ACTION")
     rationale: str = Field(description="Explanation of why this action is recommended")
+    key_factors: List[str] = Field(default_factory=list, description="Key diagnostic factors evaluated by the model")
 
 # Economic Evaluation for Candidate Actions
 class ActionEconomics(BaseModel):
@@ -63,9 +74,10 @@ class PolicyEvaluationResult(BaseModel):
 
 # Recovery Simulation Result
 class SimulationOutcome(BaseModel):
-    status: str # RECOVERED, FAILED, ESCALATED, BLOCKED, DUPLICATE_BLOCKED
+    status: str # RECOVERED, FAILED, ESCALATED, FRAUD_BLOCKED, DUPLICATE_BLOCKED
     simulated_probability: float
     recovered_amount: float     # Gross revenue recovered
+    fraud_loss_prevented: float = 0.0 # Fraud loss prevented if fraud safely blocked
     intervention_cost: float    # Synthetic operational cost
     net_recovered_amount: float # Net = Gross - Cost
     notes: str
@@ -77,6 +89,7 @@ class RecoveryPipelineResponse(BaseModel):
     event_id: Optional[str] = None
     is_duplicate: bool = False
     message: Optional[str] = None
+    risk_profile: Optional[RiskProfile] = None
     llm_mode: str
     llm_diagnosis: LLMDiagnosisOutput
     economic_evaluation: Optional[EconomicEvaluationResult] = None
@@ -106,6 +119,7 @@ class PaymentRecordOut(BaseModel):
     # AI Recovery
     recovery_action_taken: Optional[str] = None
     recovered_amount: float = 0.0
+    fraud_loss_prevented: float = 0.0
     intervention_cost: float = 0.0
     net_recovered_amount: float = 0.0
     
@@ -113,6 +127,7 @@ class PaymentRecordOut(BaseModel):
     baseline_status: Optional[str] = None
     baseline_retries: int = 0
     baseline_recovered_amount: float = 0.0
+    baseline_fraud_loss_prevented: float = 0.0
     baseline_intervention_cost: float = 0.0
     baseline_net_recovered_amount: float = 0.0
     
@@ -121,6 +136,7 @@ class PaymentRecordOut(BaseModel):
     rule_baseline_action: Optional[str] = None
     rule_baseline_retries: int = 0
     rule_baseline_recovered_amount: float = 0.0
+    rule_baseline_fraud_loss_prevented: float = 0.0
     rule_baseline_intervention_cost: float = 0.0
     rule_baseline_net_recovered_amount: float = 0.0
 
@@ -143,6 +159,7 @@ class AuditLogOut(BaseModel):
     simulation_status: str
     simulated_probability: float
     recovered_amount: float
+    fraud_loss_prevented: float = 0.0
     intervention_cost: float = 0.0
     net_recovered_amount: float = 0.0
     timestamp: datetime
@@ -156,6 +173,7 @@ class StrategyMetrics(BaseModel):
     description: str
     total_revenue_at_risk: float
     total_recovered_revenue: float       # Gross
+    total_fraud_loss_prevented: float = 0.0 # Prevented fraud loss
     total_intervention_cost: float       # Cost
     total_net_recovered_revenue: float   # Net = Gross - Cost
     revenue_recovery_rate_pct: float     # Gross Recovered / Revenue at Risk
@@ -253,16 +271,19 @@ class SystemOverview(BaseModel):
     total_records: int
     revenue_at_risk: float
     recovered_revenue_ai: float          # Gross
+    fraud_loss_prevented_ai: float = 0.0
     net_recovered_revenue_ai: float      # Net
     revenue_recovery_rate_ai: float      # Gross / Risk
     transaction_recovery_rate_ai: float  # Count / Total
     
     recovered_revenue_baseline: float
+    fraud_loss_prevented_baseline: float = 0.0
     net_recovered_revenue_baseline: float
     revenue_recovery_rate_baseline: float
     transaction_recovery_rate_baseline: float
     
     recovered_revenue_rule_baseline: float = 0.0
+    fraud_loss_prevented_rule_baseline: float = 0.0
     net_recovered_revenue_rule_baseline: float = 0.0
     revenue_recovery_rate_rule_baseline: float = 0.0
     transaction_recovery_rate_rule_baseline: float = 0.0

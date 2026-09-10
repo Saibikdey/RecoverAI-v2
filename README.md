@@ -1,261 +1,613 @@
 # RecoverAI
 
-> **AI-Assisted Revenue Recovery Agent with Deterministic Safety Guardrails**  
-> **Track**: Razorpay AI Buildathon 2026 — Track 03: AI Revenue Recovery
+> **AI-Assisted Revenue Recovery with Deterministic Safety Guardrails**
+
+RecoverAI is a synthetic payment-recovery decisioning system that combines contextual AI diagnosis, structured risk assessment, economic evaluation, and deterministic policy controls to decide how failed payments should be handled.
+
+> **AI RECOMMENDS. ECONOMICS EVALUATES. POLICY ENGINE DECIDES.**
+
+The project was originally developed for the **Razorpay AI Buildathon 2026 — Track 03: AI Revenue Recovery** and has since been evolved into a portfolio-grade decisioning architecture.
 
 ---
 
-## 📌 Problem & Solution
+## 📌 Problem
 
-### Problem
-Failed digital payments are not all the same. Traditional payment recovery relies on rigid, blind retries that repeatedly trigger issuer declines, cause customer fatigue, and waste transaction fees on permanent errors (such as expired cards or daily limits).
+Failed digital payments are not all the same.
 
-### Solution
-**RecoverAI** contextually diagnoses failed transactions using AI, recommends a tailored recovery intervention, and routes that recommendation through a deterministic Policy Engine before any recovery action is simulated.
+A blind retry strategy can repeatedly retry permanent failures, waste intervention costs, increase customer fatigue, and potentially create unsafe behavior around sensitive payment events.
 
----
+For example:
 
-## ⚠️ IMPORTANT: SIMULATION ONLY
+* A temporary bank outage may justify a retry.
+* An expired card should not be retried.
+* A suspected fraud event should be contained immediately.
+* A high-value or VIP transaction may require human escalation.
+* A low-confidence AI recommendation should not be executed autonomously.
 
-> [!CAUTION]
-> **This application is a strictly controlled synthetic simulation**:
-> - **All payment records are 100% synthetic**.
-> - **No real money is moved**, and **no real payment credentials** or live banking gateways are used.
-> - Recovery outcomes, probabilities, and financial figures represent **Simulated Revenue Recovered** generated under documented synthetic domain assumptions.
-> - Results are comparative research simulations, **not claims of real-world production performance**.
-> - Pseudorandom seed `42` is used for **100% deterministic reproducibility** during live demos, accompanied by an automated **20-seed robustness evaluation** across 2,000 transactions.
-> - The evaluation uses a synthetic outcome model with documented probability assumptions (see [`simulator.py`](backend/app/services/simulator.py)). Therefore, the comparison should be interpreted as a **controlled simulation of strategy performance**, not empirical evidence of real-world recovery rates. The 20-seed run tests whether the observed strategy difference **remains consistent across different synthetic transaction mixes** — it does not establish real-world statistical significance.
-> - The AI **confidence score** is an internal decision signal used by the Policy Engine's confidence threshold guardrail; it is **not a calibrated real-world accuracy probability**.
+The challenge is therefore not simply **"should we retry?"**
+
+It is:
+
+> **What is the safest and most economically sensible recovery action for this specific failed payment?**
 
 ---
 
-## 💡 Why AI + Rules?
+## 💡 Solution
 
-> **"AI performs contextual root-cause diagnosis and recommends an action; deterministic rules validate and authorize the action."**
->
-> **AI RECOMMENDS. POLICY ENGINE DECIDES. ECONOMICS WEIGHS.**
+RecoverAI processes each failed payment through a controlled decision pipeline:
 
-- **Why AI?** Digital payment failures are multifaceted. The same error code (`DO_NOT_HONOR` or `LIMIT_EXCEEDED`) requires different handling depending on customer tier (VIP vs Standard), prior retry count, and transaction amount. AI provides contextual reasoning that static lookup tables cannot provide.
-- **Why Deterministic Rules?** Financial systems require zero-trust safety. An LLM must **never** have autonomous authority to debit accounts or modify financial ledgers. The deterministic Policy Engine acts as the sole, unalterable final authority.
-
-```
-Payment Failure Event
-         │
-         ▼
+```text
+Payment Event
+      │
+      ▼
 ┌──────────────────────────────────────────────┐
-│       1. IDEMPOTENCY / EVENT GUARD           │
-│  • Checks unique event_id                    │
-│  • Blocks duplicate execution attempts       │
+│ 1. IDEMPOTENCY / EVENT GUARD                 │
+│ • Unique event_id validation                 │
+│ • Duplicate execution blocked                │
 └──────────────────────┬───────────────────────┘
-                       │ Valid New Event
+                       │
                        ▼
 ┌──────────────────────────────────────────────┐
-│        2. AI DIAGNOSTIC LAYER                │
-│  • Contextual Root-Cause Analysis            │
-│  • Confidence Score (0.0 to 1.0)             │
-│  • Recommended Action (ADVISORY ONLY)        │
+│ 2. STRUCTURED RISK ASSESSMENT                │
+│ • Financial exposure                         │
+│ • Security / fraud risk                      │
+│ • Customer fatigue                           │
+│ • Recovery feasibility                       │
+│ • Operational urgency                        │
+│ • Key risk factors                           │
 └──────────────────────┬───────────────────────┘
-                       │ Advisory Proposal
+                       │
                        ▼
 ┌──────────────────────────────────────────────┐
-│     3. DETERMINISTIC POLICY ENGINE           │
-│          (THE FINAL AUTHORITY)               │
-│  • Action Whitelist Enforcement              │
-│  • Max Retries Guard (Attempts >= 3)         │
-│  • Confidence Threshold Guard (< 0.65)       │
-│  • Fraud Zero-Tolerance Protection           │
-│  • Expired Instrument Alternative Routing    │
-│  • High-Value & VIP Account Escalation       │
+│ 3. AI DIAGNOSTIC LAYER                       │
+│ • Contextual root-cause analysis             │
+│ • Confidence score                           │
+│ • Recommended recovery action                │
+│ • Explanation + key factors                  │
+│ • Deterministic fallback when unavailable    │
 └──────────────────────┬───────────────────────┘
-                       │ Authorized Action
+                       │
                        ▼
 ┌──────────────────────────────────────────────┐
-│       4. RECOVERY SIMULATION & AUDIT         │
-│  • Synthetic Probabilistic Execution         │
-│  • Immutable SQLite Audit Trail              │
-│  • Analytics & 3-Way Comparative Reporting   │
+│ 4. ECONOMIC EVALUATION                       │
+│ • Evaluates candidate actions                │
+│ • Simulated recovery probability             │
+│ • Expected gross recovery                    │
+│ • Intervention cost                          │
+│ • Expected net recovery                      │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 5. DETERMINISTIC POLICY ENGINE               │
+│              FINAL AUTHORITY                 │
+│ • Action whitelist                           │
+│ • Fraud zero-tolerance                       │
+│ • Maximum retry guard                        │
+│ • Confidence threshold                       │
+│ • Expired-card protection                    │
+│ • High-value / VIP escalation                │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 6. POLICY-APPROVED SIMULATION                │
+│ • Synthetic recovery outcome                 │
+│ • Recovery cost                              │
+│ • Net recovery                               │
+│ • Fraud loss prevented                       │
+└──────────────────────┬───────────────────────┘
+                       │
+                       ▼
+┌──────────────────────────────────────────────┐
+│ 7. AUDIT & ANALYTICS                         │
+│ • Decision reasoning                         │
+│ • Policy overrides                           │
+│ • Risk profile                               │
+│ • Economic evaluation                        │
+│ • Idempotency events                         │
+│ • Comparative strategy metrics               │
 └──────────────────────────────────────────────┘
 ```
 
-> [!IMPORTANT]
-> **The LLM is advisory only. It cannot directly execute financial actions or modify user balances.**
+### Architectural principle
+
+The AI layer **never has direct execution authority**.
+
+The AI produces an advisory diagnosis and recommended action. Economic evaluation measures the expected value of available actions. The deterministic Policy Engine then validates the recommendation against hard safety rules and remains the **final execution authority**.
+
+This separation makes the system easier to audit, test, and reason about.
 
 ---
 
-## 🛡️ Deterministic Safety Guardrails
+## ⚠️ Important: Simulation Only
 
-| Guardrail | Rule Trigger | Policy Engine Action | Audit Override Reason |
-|---|---|---|---|
-| **1. Idempotency Guard** | Duplicate `event_id` | `DUPLICATE_BLOCKED` | *Idempotency Guard: Event ID already processed. Duplicate blocked.* |
-| **2. Action Whitelist** | Proposal $\notin$ Allowed Set | Override to `ESCALATE` | *Security Violation: Unauthorized action blocked.* |
-| **3. Fraud Protection** | `SUSPECTED_FRAUD` | Strictly `NO_ACTION` | *Fraud Safety Guard: Retries/reminders forbidden to prevent chargebacks.* |
-| **4. Expired Card** | `CARD_EXPIRED` | Override to `ALTERNATE_PAYMENT` | *Permanent Error Guard: Expired card retry guaranteed to fail.* |
-| **5. Max Retries** | Prior Retries $\ge 3$ | Override to `ALTERNATE_PAYMENT` / `ESCALATE` | *Max Retries Exhausted: Exceeded retry limit (3/3).* |
-| **6. Confidence Guard** | Confidence $< 0.65$ | Override to `ESCALATE` | *Confidence Guard: Score below safe autonomous threshold (0.65).* |
-| **7. High-Value / VIP** | Amount $\ge$ ₹50,000 or VIP | Override to `ESCALATE` | *High-Value Guard: Critical transaction routed to relationship desk.* |
+> **RecoverAI is a controlled synthetic simulation, not a live payment system.**
 
-### Whitelisted Actions
-1. `RETRY`: Automated re-attempt for transient server downtime (`BANK_SERVER_DOWN`, `NETWORK_TIMEOUT`).
-2. `ALTERNATE_PAYMENT`: Prompt customer to switch instrument (`CARD_EXPIRED`, `LIMIT_EXCEEDED`).
-3. `REMINDER`: 1-click notification prompt for dropouts (`AUTHENTICATION_FAILED_3DS`, `INSUFFICIENT_FUNDS`).
-4. `ESCALATE`: Priority routing to human relationship managers for VIP accounts or complex declines (`DO_NOT_HONOR`).
-5. `NO_ACTION`: Immediate containment and block for security flags (`SUSPECTED_FRAUD`).
+* All payment records are **100% synthetic**.
+* No real money is moved.
+* No real payment credentials are used.
+* No live banking or payment gateway is connected.
+* Recovery outcomes and financial values are generated using documented synthetic probability assumptions.
+* Reported recovery metrics are **simulation results**, not production performance claims.
+* Seed `42` provides deterministic reproducibility for demonstrations.
+* A separate 20-seed evaluation tests whether the strategy gap persists across different synthetic transaction mixes.
+* The 20-seed evaluation does **not** establish real-world statistical significance.
+* AI confidence is an internal policy signal, **not a calibrated real-world probability of correctness**.
+
+The simulator is intentionally treated as an experimental evaluation environment.
 
 ---
 
-## 📊 3-Way Strategy Comparison (100-Record Seed 42 Batch)
+# 🛡️ Deterministic Safety Model
 
-| Metric | RecoverAI (AI + Policy) | Simple Rule | Blind Retry |
-|---|---|---|---|
-| **Total Revenue at Risk** | ₹3,636,475.84 | ₹3,636,475.84 | ₹3,636,475.84 |
-| **Gross recovered** | **₹2,674,177.71** | ₹2,039,557.48 | ₹1,003,861.09 |
-| **Intervention cost** | **₹2,555.00** | ₹1,155.00 | ₹5,360.00 |
-| **Net recovered** | **₹2,671,622.71** | ₹2,038,402.48 | ₹998,501.09 |
-| **Revenue recovery** | **73.54%** | 56.09% | 27.61% |
-| **Transaction recovery** | **84.0%** (84 / 100) | 65.0% | 24.0% |
-| **Retries** | **32** | — | — |
-| **Wasted / failed retries** | **0** | — | — |
-| **Policy overrides** | **15** | — | — |
-| **Fraud blocks** | **5** (100% blocked) | — | — |
+RecoverAI uses explicit guardrails between AI recommendations and simulated execution.
+
+| Guardrail                | Trigger                      | Policy Response                  |
+| ------------------------ | ---------------------------- | -------------------------------- |
+| **Idempotency**          | Duplicate `event_id`         | `DUPLICATE_BLOCKED`              |
+| **Action Whitelist**     | Unauthorized proposed action | `ESCALATE`                       |
+| **Fraud Protection**     | `SUSPECTED_FRAUD`            | `NO_ACTION`                      |
+| **Expired Card**         | `CARD_EXPIRED`               | `ALTERNATE_PAYMENT`              |
+| **Maximum Retries**      | Prior retries ≥ 3            | `ALTERNATE_PAYMENT` / `ESCALATE` |
+| **Confidence Threshold** | Confidence < 0.65            | `ESCALATE`                       |
+| **High-Value / VIP**     | Amount ≥ ₹50,000 or VIP      | `ESCALATE`                       |
+
+### Why deterministic policy?
+
+LLMs are probabilistic systems. Financial decisioning requires predictable boundaries.
+
+RecoverAI therefore follows:
+
+```text
+LLM recommendation
+       │
+       ▼
+Deterministic validation
+       │
+       ├── Unsafe → Override
+       │
+       └── Safe → Authorize
+```
+
+The LLM cannot bypass the Policy Engine.
 
 ---
 
-## 🔬 20-Seed Robustness Evaluation (20 Seeds, 2,000 Transactions)
+## 🧠 Structured Risk Profile
 
-> **What this evaluation shows, and what it doesn't:** This evaluation uses controlled synthetic simulations and documented probability assumptions in [`simulator.py`](backend/app/services/simulator.py). It does **not** claim real-world statistical significance or live gateway performance. The 20-seed run measures robustness across different synthetic transaction mixes, not empirical production outcomes.
+Before the AI diagnosis is generated, RecoverAI creates a deterministic risk profile containing:
 
-To check that the strategy gap is not an artifact of the specific seed-42 transaction mix, RecoverAI includes a robustness evaluation across 20 distinct pseudo-random datasets:
+* **Financial exposure**
+* **Security risk**
+* **Customer fatigue risk**
+* **Recovery feasibility**
+* **Operational urgency**
+* **Customer tier**
+* **Retry history**
+* **Key risk factors**
+
+This structured context is passed to the AI diagnostic layer so that the model does not reason from the error code alone.
+
+For example, the same `DO_NOT_HONOR` failure can require different handling depending on:
+
+* transaction amount
+* customer tier
+* previous retries
+* security risk
+* recovery feasibility
+
+---
+
+# 💰 Economics Evaluation
+
+RecoverAI does not treat the AI recommendation as automatically economically optimal.
+
+The economic layer evaluates the available policy-compatible actions using the synthetic outcome model.
+
+For each candidate action, it estimates:
+
+```text
+Expected Gross Recovery
+        -
+Intervention Cost
+        =
+Expected Net Recovery
+```
+
+The system records:
+
+* recommended action
+* recommended action expected net recovery
+* economically optimal action
+* economically optimal expected net recovery
+* simulated recovery probability
+* intervention cost
+
+### Important architectural distinction
+
+**Economics evaluates. Policy decides.**
+
+The economic evaluation does **not** override the deterministic safety policy.
+
+A financially attractive action can still be rejected if it violates a safety rule.
+
+---
+
+# 📊 Seed 42 Strategy Comparison
+
+The default demonstration uses **100 synthetic failed payments with seed 42**.
+
+| Metric                            |         RecoverAI |   Simple Rule |   Blind Retry |
+| --------------------------------- | ----------------: | ------------: | ------------: |
+| Revenue at Risk                   |     ₹3,636,475.84 | ₹3,636,475.84 | ₹3,636,475.84 |
+| Gross Recovered                   | **₹2,674,177.71** | ₹2,039,557.48 | ₹1,003,861.09 |
+| Intervention Cost                 |     **₹2,555.00** |     ₹1,155.00 |     ₹5,360.00 |
+| Net Recovered                     | **₹2,671,622.71** | ₹2,038,402.48 |   ₹998,501.09 |
+| Revenue Recovery                  |        **73.54%** |        56.09% |        27.61% |
+| Transaction Recovery              |         **84.0%** |         65.0% |         24.0% |
+| RecoverAI Retries                 |            **32** |             — |             — |
+| Wasted / Failed RecoverAI Retries |             **0** |             — |             — |
+| Policy Overrides                  |            **15** |             — |             — |
+| Fraud Blocks                      |         **5 / 5** |             — |             — |
+
+All monetary values above represent **synthetic simulated outcomes**.
+
+---
+
+# 🔬 20-Seed Robustness Evaluation
+
+To reduce dependence on a single random transaction mix, RecoverAI includes an automated evaluation across:
+
+* **20 independent seeds**
+* **100 synthetic transactions per seed**
+* **2,000 total transactions**
+
+Run:
 
 ```bash
 python3 backend/scripts/evaluate_seeds.py
 ```
 
-### 20-Seed Aggregate Results
+## Aggregate Results
 
-| Metric | RecoverAI (AI + Policy) | Simple Rule Baseline | Blind Retry Baseline |
-|---|---|---|---|
-| **Mean gross recovered** | **₹2,552,810.19** | — | — |
-| **Mean intervention cost** | **₹2,110.50** | — | — |
-| **Mean net recovered** | **₹2,550,699.69** | **₹1,847,238.48** | **₹699,693.11** |
-| **Mean revenue recovery** | **68.62%** | — | — |
-| **Mean transaction recovery** | **82.15%** | — | — |
-| **Recovery rate range** | **74.0%–89.0%** | — | — |
-| **Median recovery rate** | **82.0%** | — | — |
-| **Standard deviation** | **±4.22%** | — | — |
-| **Net uplift vs Rule** | **+₹703,461.20 (+38.08%)** | — | — |
-| **Net uplift vs Blind** | **+₹1,851,006.58 (+264.55%)** | — | — |
-| **Transaction advantage vs Rule** | **+19.10 percentage points** | — | — |
-| **Transaction advantage vs Blind** | **+61.40 percentage points** | — | — |
+| Metric                         |         RecoverAI |   Simple Rule | Blind Retry |
+| ------------------------------ | ----------------: | ------------: | ----------: |
+| Mean Gross Recovered           | **₹2,552,810.19** | ₹1,848,440.23 | ₹705,080.11 |
+| Mean Intervention Cost         |     **₹2,110.50** |     ₹1,201.75 |   ₹5,387.00 |
+| Mean Net Recovered             | **₹2,550,699.69** | ₹1,847,238.48 | ₹699,693.11 |
+| Mean Revenue Recovery          |        **68.62%** |        49.91% |      18.90% |
+| Mean Transaction Recovery      |        **77.50%** |        58.40% |      20.75% |
+| Transaction Recovery Range     |       **71%–84%** |             — |           — |
+| Median Transaction Recovery    |         **77.5%** |             — |           — |
+| Transaction Recovery Std. Dev. |        **±3.79%** |        ±4.88% |      ±4.58% |
+
+### Economic uplift
+
+**Versus Simple Rule Baseline**
+
+* **+₹703,461.20 mean net revenue**
+* **+38.08% net revenue uplift**
+* **+19.10 percentage points transaction recovery**
+
+**Versus Blind Retry Baseline**
+
+* **+₹1,851,006.58 mean net revenue**
+* **+264.55% net revenue uplift**
+* **+56.75 percentage points transaction recovery**
+
+These results demonstrate consistency within the **synthetic simulation model**. They should not be interpreted as evidence of production performance.
 
 ---
 
-## 💻 Tech Stack
+# 🔐 Fraud Accounting
 
-- **Backend**: Python 3.10+, FastAPI, SQLAlchemy, SQLite, Pydantic V2, Pytest, HTTPX.
-- **Frontend**: React 18, Vite, Tailwind CSS, Lucide React.
-- **AI Diagnostics**: Google Gemini (`gemini-1.5-flash`) / OpenAI (`gpt-4o-mini`) via environment variables with a **built-in Deterministic Heuristic Fallback Engine** (works 100% without API keys).
+RecoverAI explicitly separates successful revenue recovery from fraud prevention.
 
----
+For a suspected fraud transaction:
 
-## 🚀 Local Setup & Quickstart
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+ and npm
-
-### 1. Backend Setup
-```bash
-cd backend
-
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run full automated test suite (15 / 15 tests pass)
-pytest tests/test_core.py -v
-
-# Run 20-seed robustness evaluation
-python3 scripts/evaluate_seeds.py
-
-# Start FastAPI backend server (http://127.0.0.1:8000)
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```text
+Status                = FRAUD_BLOCKED
+Recovery Action       = NO_ACTION
+Revenue Recovered     = ₹0
+Fraud Loss Prevented  = Transaction Amount
+Intervention Cost     = ₹0
+Net Recovered         = ₹0
 ```
 
-### 2. Frontend Setup
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Build for production (verifies zero build errors)
-npm run build
-
-# Start Vite dev server (http://localhost:5173)
-npm run dev
-```
-
-Open **`http://localhost:5173`** in your browser to access the dashboard.
+This prevents prevented fraud exposure from being incorrectly reported as recovered revenue.
 
 ---
 
-## 🔑 Environment Variables & LLM Mode
+# 🔄 Idempotency
 
-RecoverAI operates **completely out-of-the-box in Deterministic Fallback Mode** without requiring any API keys.
+Payment events are protected using unique event identifiers.
 
-To enable live LLM mode, copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
+A duplicate event cannot trigger another recovery execution.
+
+```text
+First event
+    ↓
+Process normally
+    ↓
+Persist ProcessedEvent
+    ↓
+Same event arrives again
+    ↓
+DUPLICATE_BLOCKED
 ```
-Set your API key:
-```env
-GEMINI_API_KEY=<your_api_key_here>
-# or
-OPENAI_API_KEY=<your_api_key_here>
-```
-The dashboard header displays a live badge indicating whether the current run used **"LLM Mode"** or **"Deterministic Fallback Mode"**.
+
+This is particularly important for event-driven financial systems where duplicate delivery can occur.
 
 ---
 
-## 🎮 5-Minute Demo Walkthrough
+# 🧪 Automated Testing
 
-1. **Open Dashboard**: Navigate to `http://localhost:5173`.
-2. **Reset Dataset**: Click **"Reset (100)"** in the top navigation bar to generate 100 fresh synthetic failed payments.
-3. **Run 3 Strategies**:
-   - Click **"1. Blind Retry"** to simulate blind 3x retries.
-   - Click **"2. Rule Baseline"** to simulate static rule-based recovery.
-   - Click **"3. Run RecoverAI"** to execute AI diagnosis with policy engine authorization.
-4. **Compare 3 Strategies**: Observe the side-by-side comparison of gross recovery, intervention cost, net recovery, and recovery rates.
-5. **View 20-Seed Robustness Evaluation**: Expand the **"20-Seed Robustness Evaluation"** drawer to view consistency across 2,000 simulated transactions under the documented synthetic probability model.
-6. **Inspect Single Payment & Idempotency**:
-   - Navigate to the **"Transactions"** tab and click **"Diagnose"** on any transaction to view the 4-stage pipeline stepper (**"AI RECOMMENDS. POLICY ENGINE DECIDES."**).
-7. **Inspect Audit Trail**: Switch to the **"Audit Trail"** tab to filter by **"Overrides Only"** or **"Duplicates Blocked"**.
-8. **View Safety Model**: Switch to the **"Architecture & Safety Model"** tab to inspect the zero-trust execution boundary.
+The current backend test suite contains **22 tests** covering the core decisioning architecture.
 
----
+Run:
 
-## 🧪 Automated Test Suite
-
-Run the full pytest suite:
 ```bash
 pytest backend/tests/test_core.py -v
 ```
-**Tests Covered (15 / 15 Passing)**:
-- Synthetic dataset generation (100 records)
-- Revenue at risk calculation
-- LLM structured JSON output schema & fallback
-- Deterministic policy engine max retries guard
-- Fraud zero-tolerance guard
-- Expired card guard
-- Confidence threshold guard
-- High-value / VIP account guard
-- Authority boundary invariance
-- **Idempotency: first event execution success & duplicate blocked**
-- **Idempotency: distinct events execute independently**
-- **Baseline 2: Rule-Based recovery simulation**
-- **3-Way Strategy comparative analytics**
-- **Multi-seed robustness evaluation runner**
-- FastAPI REST endpoints integration
+
+Coverage includes:
+
+* Synthetic dataset generation
+* Revenue-at-risk calculation
+* Structured LLM output validation
+* Deterministic fallback behavior
+* Risk profile generation
+* Policy action whitelist
+* Maximum retry guard
+* Fraud zero-tolerance guard
+* Expired-card guard
+* Confidence threshold guard
+* High-value / VIP guard
+* Authority-boundary invariance
+* Idempotency
+* Duplicate event blocking
+* Independent event execution
+* Rule-based baseline
+* Three-way strategy analytics
+* Economic evaluation
+* Fraud accounting
+* Multi-seed robustness evaluation
+* Batch processing behavior
+* Reset / reproducibility behavior
+
+---
+
+# 💻 Tech Stack
+
+### Backend
+
+* Python 3.10+
+* FastAPI
+* SQLAlchemy
+* SQLite
+* Pydantic V2
+* Pytest
+* HTTPX
+
+### Frontend
+
+* React 18
+* Vite
+* Tailwind CSS
+* Lucide React
+
+### AI Diagnostics
+
+* Google Gemini
+* OpenAI
+* Deterministic heuristic fallback engine
+
+The application can run without an API key by using deterministic fallback diagnosis.
+
+---
+
+# 🚀 Local Setup
+
+## Prerequisites
+
+* Python 3.10+
+* Node.js 18+
+* npm
+
+## Backend
+
+```bash
+cd backend
+
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install -r requirements.txt
+
+pytest tests/test_core.py -v
+
+python3 scripts/evaluate_seeds.py
+
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Backend:
+
+```text
+http://127.0.0.1:8000
+```
+
+## Frontend
+
+In another terminal:
+
+```bash
+cd frontend
+
+npm install
+
+npm run build
+
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
+
+---
+
+# 🔑 Optional LLM Configuration
+
+RecoverAI works without an external API key through its deterministic fallback engine.
+
+To enable live LLM diagnosis:
+
+```bash
+cp .env.example .env
+```
+
+Then configure one provider:
+
+```env
+GEMINI_API_KEY=<your_api_key>
+```
+
+or:
+
+```env
+OPENAI_API_KEY=<your_api_key>
+```
+
+Never commit `.env` or API credentials.
+
+The application reports whether the current run used:
+
+```text
+LLM Mode
+```
+
+or:
+
+```text
+Deterministic Fallback Mode
+```
+
+---
+
+# 🎮 5-Minute Demo
+
+1. Start the backend and frontend.
+2. Open the dashboard.
+3. Reset the dataset to generate 100 synthetic failed payments.
+4. Run the **Blind Retry** baseline.
+5. Run the **Rule Baseline**.
+6. Run **RecoverAI**.
+7. Compare:
+
+   * Gross recovery
+   * Intervention cost
+   * Net recovery
+   * Transaction recovery
+   * Policy overrides
+   * Fraud blocks
+8. Open an individual transaction to inspect the decision pipeline.
+9. Inspect the audit trail.
+10. Review the architecture and safety model.
+11. Run the 20-seed evaluation for robustness.
+
+---
+
+# 🏗️ Project Structure
+
+```text
+RecoverAI-v2/
+│
+├── backend/
+│   ├── app/
+│   │   ├── models.py
+│   │   ├── schemas.py
+│   │   ├── main.py
+│   │   ├── routers/
+│   │   └── services/
+│   │       ├── llm_service.py
+│   │       ├── orchestrator.py
+│   │       ├── policy_engine.py
+│   │       ├── risk_engine.py
+│   │       └── simulator.py
+│   │
+│   ├── scripts/
+│   │   └── evaluate_seeds.py
+│   │
+│   ├── tests/
+│   │   └── test_core.py
+│   │
+│   └── requirements.txt
+│
+├── frontend/
+│   ├── src/
+│   ├── package.json
+│   └── vite.config.*
+│
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+---
+
+# 🎯 Design Principles
+
+RecoverAI is built around a few core principles:
+
+### 1. AI should advise, not control
+
+The LLM provides contextual reasoning but cannot directly execute financial actions.
+
+### 2. Safety rules must be deterministic
+
+Critical constraints such as fraud blocking and maximum retries should not depend on probabilistic model behavior.
+
+### 3. Economics matters
+
+A recovery action should be evaluated based on expected value, not merely whether it appears technically possible.
+
+### 4. Decisions should be auditable
+
+The system records risk context, AI reasoning, policy decisions, economic evaluation, outcomes, and overrides.
+
+### 5. Simulation claims should remain honest
+
+Synthetic evaluation is useful for testing architecture and strategy behavior, but it is not a substitute for production payment data.
+
+### 6. Reproducibility matters
+
+Deterministic seeds and multi-seed evaluation make strategy comparisons easier to reproduce and inspect.
+
+---
+
+## 📌 Current Status
+
+**RecoverAI-v2 is a portfolio-oriented evolution of the original buildathon prototype.**
+
+Current state:
+
+* ✅ Structured risk engine
+* ✅ Context-aware AI diagnosis
+* ✅ Deterministic AI fallback
+* ✅ Economic action evaluation
+* ✅ Deterministic policy authorization
+* ✅ Fraud containment
+* ✅ Idempotency protection
+* ✅ Separate fraud-loss accounting
+* ✅ Audit logging
+* ✅ Three-way strategy comparison
+* ✅ 20-seed robustness evaluation
+* ✅ 22-test backend suite
+* ✅ Synthetic-data transparency
+* ✅ Reproducible evaluation
+
+> **The project remains a controlled simulation. No real payments or customer financial data are processed.**

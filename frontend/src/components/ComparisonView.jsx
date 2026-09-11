@@ -115,7 +115,7 @@ export default function ComparisonView({ comparison }) {
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 font-medium">Recovery Rate</span>
-                <div className="text-xl font-bold text-emerald-400 mt-0.5">{ai.recovery_rate_pct.toFixed(1)}%</div>
+                <div className="text-xl font-bold text-emerald-400 mt-0.5">{ai.transaction_recovery_rate_pct.toFixed(1)}%</div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
                   <span className="text-emerald-400 font-semibold">{ai.recovered_count}</span> of {ai.total_failed_count} txs
                 </div>
@@ -179,7 +179,7 @@ export default function ComparisonView({ comparison }) {
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 font-medium">Recovery Rate</span>
-                <div className="text-xl font-bold text-purple-400 mt-0.5">{(rule?.recovery_rate_pct || 0).toFixed(1)}%</div>
+                <div className="text-xl font-bold text-purple-400 mt-0.5">{(rule?.transaction_recovery_rate_pct || 0).toFixed(1)}%</div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
                   <span className="text-purple-300 font-semibold">{rule?.recovered_count || 0}</span> of {rule?.total_failed_count || 100} txs
                 </div>
@@ -243,7 +243,7 @@ export default function ComparisonView({ comparison }) {
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 font-medium">Recovery Rate</span>
-                <div className="text-xl font-bold text-amber-400 mt-0.5">{blind.recovery_rate_pct.toFixed(1)}%</div>
+                <div className="text-xl font-bold text-amber-400 mt-0.5">{blind.transaction_recovery_rate_pct.toFixed(1)}%</div>
                 <div className="text-[10px] text-slate-400 mt-0.5">
                   <span className="text-amber-300 font-semibold">{blind.recovered_count}</span> of {blind.total_failed_count} txs
                 </div>

@@ -32,25 +32,25 @@ export default function AuditTrail({ auditLogs, onRefresh }) {
   const duplicatesCount = auditLogs.filter(l => l.duplicate_blocked).length;
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl shadow-md overflow-hidden">
+    <div className="bg-slate-900/90 border border-slate-800 rounded-xl shadow-md overflow-hidden w-full max-w-full min-w-0">
       
       {/* Header / Filter Toolbar */}
-      <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-950/40">
+      <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-slate-950/40">
         <div>
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            Decision Audit Trail & Guardrail Log
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Decision Audit Trail & Guardrail Log</span>
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-tight">
             Immutable log recording every LLM recommendation, policy evaluation, and outcome
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-2 w-full md:w-auto min-w-0">
           {/* All Filter */}
           <button
             onClick={() => setFilterMode('ALL')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
+            className={`flex items-center justify-center px-3 py-1.5 text-xs font-semibold rounded-lg border transition w-full sm:w-auto ${
               filterMode === 'ALL'
                 ? 'bg-sky-600 text-white border-sky-500 shadow-sm'
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
@@ -62,34 +62,34 @@ export default function AuditTrail({ auditLogs, onRefresh }) {
           {/* Overrides Toggle */}
           <button
             onClick={() => setFilterMode('OVERRIDES')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition w-full sm:w-auto ${
               filterMode === 'OVERRIDES'
                 ? 'bg-amber-950 text-amber-300 border-amber-600 shadow-sm shadow-amber-950'
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
             }`}
           >
-            <ShieldAlert className="w-3.5 h-3.5" />
-            Overrides ({overridesCount})
+            <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+            <span>Overrides ({overridesCount})</span>
           </button>
 
           {/* Duplicates Toggle */}
           <button
             onClick={() => setFilterMode('DUPLICATES')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition w-full sm:w-auto ${
               filterMode === 'DUPLICATES'
                 ? 'bg-rose-950 text-rose-300 border-rose-600 shadow-sm shadow-rose-950'
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
             }`}
           >
-            <Lock className="w-3.5 h-3.5" />
-            Duplicates Blocked ({duplicatesCount})
+            <Lock className="w-3.5 h-3.5 shrink-0" />
+            <span>Duplicates ({duplicatesCount})</span>
           </button>
         </div>
       </div>
 
       {/* Logs Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300">
+      <div className="overflow-x-auto w-full max-w-full min-w-0">
+        <table className="w-full min-w-[760px] text-left text-xs text-slate-300">
           <thead className="bg-slate-950/70 border-b border-slate-800 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
             <tr>
               <th className="px-4 py-3">Event / Tx ID</th>

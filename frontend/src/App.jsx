@@ -188,7 +188,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col w-full max-w-full min-w-0">
       
       {/* Top Header */}
       <Header
@@ -205,15 +205,15 @@ export default function App() {
 
       {/* Error Alert if any */}
       {fetchError && (
-        <div className="max-w-7xl mx-auto w-full px-6 pt-4">
-          <div className="bg-rose-950/80 border border-rose-700 text-rose-200 text-xs px-4 py-3 rounded-xl flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="max-w-7xl mx-auto w-full px-3.5 sm:px-6 pt-3 sm:pt-4 min-w-0 max-w-full">
+          <div className="bg-rose-950/80 border border-rose-700 text-rose-200 text-xs px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-xl flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              <span>{fetchError}</span>
+              <span className="truncate">{fetchError}</span>
             </div>
             <button 
               onClick={fetchAllData}
-              className="px-2.5 py-1 bg-rose-900 hover:bg-rose-800 rounded font-semibold text-rose-100 transition"
+              className="px-2.5 py-1 bg-rose-900 hover:bg-rose-800 rounded font-semibold text-rose-100 transition shrink-0"
             >
               Retry
             </button>
@@ -222,81 +222,81 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto w-full px-6 py-6 flex-1 space-y-6">
+      <main className="max-w-7xl mx-auto w-full px-3.5 sm:px-6 py-4 sm:py-6 flex-1 space-y-4 sm:space-y-6 min-w-0 max-w-full">
         
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-800 pb-2 overflow-x-auto w-full max-w-full min-w-0">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <BarChart3 className="w-4 h-4" />
-            Overview & 3-Way Comparison
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span>Overview & 3-Way Comparison</span>
           </button>
 
           <button
             onClick={() => setActiveTab('payments')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap ${
               activeTab === 'payments'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <ListOrdered className="w-4 h-4" />
-            Transactions ({payments.length})
+            <ListOrdered className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span>Transactions ({payments.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('audit')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap ${
               activeTab === 'audit'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <ShieldCheck className="w-4 h-4" />
-            Audit Trail ({auditLogs.length})
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span>Audit Trail ({auditLogs.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('architecture')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 text-xs font-semibold rounded-lg transition shrink-0 whitespace-nowrap ${
               activeTab === 'architecture'
                 ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
             }`}
           >
-            <Cpu className="w-4 h-4" />
-            Architecture & Safety Model
+            <Cpu className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+            <span>Architecture & Safety Model</span>
           </button>
         </div>
 
         {/* Tab 1: Overview & Comparison */}
         {activeTab === 'overview' && (
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <KpiCards overview={overview} comparison={comparison} />
             <ComparisonView comparison={comparison} />
 
             {/* Quick Distribution Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               
               {/* Failure Reasons Breakdown */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <PieChart className="w-4 h-4 text-sky-400" />
-                  Failure Code Distribution
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 min-w-0">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 sm:mb-4 flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-sky-400 shrink-0" />
+                  <span>Failure Code Distribution</span>
                 </h4>
                 <div className="space-y-2 text-xs">
                   {overview?.error_code_distribution && Object.entries(overview.error_code_distribution).map(([code, count]) => (
-                    <div key={code} className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                      <span className="font-mono text-slate-300">{code}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-semibold">{count} records</span>
-                        <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div key={code} className="flex items-center justify-between gap-2 py-1 border-b border-slate-800/60">
+                      <span className="font-mono text-slate-300 text-[11px] sm:text-xs truncate">{code}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-slate-400 font-semibold text-[11px] sm:text-xs">{count} records</span>
+                        <div className="w-16 sm:w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden shrink-0">
                           <div 
                             className="bg-sky-500 h-full rounded-full" 
                             style={{ width: `${(count / (overview?.total_records || 100)) * 100}%` }}
@@ -309,18 +309,18 @@ export default function App() {
               </div>
 
               {/* Action Routing Breakdown */}
-              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-400" />
-                  Policy-Authorized Actions Breakdown
+              <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 sm:p-5 min-w-0">
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 sm:mb-4 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>Policy-Authorized Actions Breakdown</span>
                 </h4>
                 <div className="space-y-2 text-xs">
                   {overview?.action_distribution && Object.entries(overview.action_distribution).map(([action, count]) => (
-                    <div key={action} className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                      <span className="font-mono text-slate-300">{action}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400 font-semibold">{count} records</span>
-                        <div className="w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                    <div key={action} className="flex items-center justify-between gap-2 py-1 border-b border-slate-800/60">
+                      <span className="font-mono text-slate-300 text-[11px] sm:text-xs truncate">{action}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-slate-400 font-semibold text-[11px] sm:text-xs">{count} records</span>
+                        <div className="w-16 sm:w-20 bg-slate-800 h-1.5 rounded-full overflow-hidden shrink-0">
                           <div 
                             className="bg-indigo-500 h-full rounded-full" 
                             style={{ width: `${(count / (overview?.total_records || 100)) * 100}%` }}

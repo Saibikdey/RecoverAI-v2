@@ -89,10 +89,10 @@ export default function TransactionTable({
   });
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl shadow-md overflow-hidden">
+    <div className="bg-slate-900/90 border border-slate-800 rounded-xl shadow-md overflow-hidden w-full max-w-full min-w-0">
       
       {/* Table Toolbar */}
-      <div className="p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+      <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
         
         {/* Search */}
         <div className="relative w-full md:w-72">
@@ -107,12 +107,12 @@ export default function TransactionTable({
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:flex md:flex-wrap items-center gap-2 w-full md:w-auto min-w-0">
           {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
           >
             <option value="ALL">All Statuses</option>
             <option value="FAILED">Failed</option>
@@ -123,7 +123,7 @@ export default function TransactionTable({
           <select
             value={errorFilter}
             onChange={(e) => setErrorFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
           >
             <option value="ALL">All Failure Reasons</option>
             <option value="INSUFFICIENT_FUNDS">Insufficient Funds</option>
@@ -140,7 +140,7 @@ export default function TransactionTable({
           <select
             value={tierFilter}
             onChange={(e) => setTierFilter(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
+            className="w-full sm:w-auto bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-600"
           >
             <option value="ALL">All Customer Tiers</option>
             <option value="STANDARD">Standard</option>
@@ -148,7 +148,7 @@ export default function TransactionTable({
             <option value="ENTERPRISE">Enterprise</option>
           </select>
 
-          <span className="text-xs text-slate-500 ml-auto">
+          <span className="text-xs text-slate-500 w-full sm:w-auto text-left sm:text-right md:ml-auto col-span-1 sm:col-span-3 md:col-span-1">
             Showing <strong className="text-slate-300">{filtered.length}</strong> of {payments.length}
           </span>
         </div>
@@ -156,8 +156,8 @@ export default function TransactionTable({
       </div>
 
       {/* Table Element */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300">
+      <div className="overflow-x-auto w-full max-w-full min-w-0">
+        <table className="w-full min-w-[760px] text-left text-xs text-slate-300">
           <thead className="bg-slate-950/70 border-b border-slate-800 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
             <tr>
               <th className="px-4 py-3">Tx ID / Customer</th>

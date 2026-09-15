@@ -27,7 +27,7 @@ export default function ArchitectureView() {
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-base sm:text-lg font-bold text-white">System Architecture & Safety Model</h3>
-            <p className="text-[11px] sm:text-xs text-sky-300/80">Built for Razorpay AI Buildathon Track 03: AI Revenue Recovery Agent</p>
+            <p className="text-[11px] sm:text-xs text-sky-300/80">AI-Assisted Revenue Recovery with Deterministic Policy Guardrails</p>
           </div>
         </div>
 
@@ -63,7 +63,7 @@ export default function ArchitectureView() {
       {/* 5-Stage Recovery Pipeline Visual */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 min-w-0 max-w-full">
         <h4 className="text-xs sm:text-sm font-bold text-white mb-4 sm:mb-6 uppercase tracking-wider text-slate-400">
-          The 5-Stage Autonomous Recovery Pipeline
+          The 5-Stage Recovery Decision Pipeline
         </h4>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 relative min-w-0 max-w-full">

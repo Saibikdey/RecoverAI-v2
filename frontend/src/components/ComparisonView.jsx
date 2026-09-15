@@ -100,7 +100,7 @@ export default function ComparisonView({ comparison }) {
                 <Sparkles className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-bold text-white truncate">{ai.name}</h3>
+                <h3 className="text-sm sm:text-base font-bold text-white break-words leading-snug">{ai.name}</h3>
                 <p className="text-[10px] sm:text-[11px] text-slate-400 leading-tight">AI root-cause diagnosis + strict policy guardrails</p>
               </div>
             </div>
@@ -164,7 +164,7 @@ export default function ComparisonView({ comparison }) {
                 <Binary className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-bold text-slate-200 truncate">{rule?.name || 'Simple Rule-Based'}</h3>
+                <h3 className="text-sm sm:text-base font-bold text-slate-200 break-words leading-snug">{rule?.name || 'Simple Rule-Based'}</h3>
                 <p className="text-[10px] sm:text-[11px] text-purple-300/80 leading-tight">Static deterministic rules without AI context</p>
               </div>
             </div>
@@ -228,7 +228,7 @@ export default function ComparisonView({ comparison }) {
                 <Layers className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm sm:text-base font-bold text-slate-200 truncate">{blind.name}</h3>
+                <h3 className="text-sm sm:text-base font-bold text-slate-200 break-words leading-snug">{blind.name}</h3>
                 <p className="text-[10px] sm:text-[11px] text-amber-300/80 leading-tight">Blind 3x retries without diagnosis or policy</p>
               </div>
             </div>

@@ -24,7 +24,16 @@ export default function Header({
   loadingRuleBaseline,
   loadingReset
 }) {
-  const isLlm = llmMode && llmMode.includes("LLM Mode") && !llmMode.includes("Fallback");
+  const isLlm = Boolean(
+    llmMode && 
+    (llmMode.includes("LLM Mode") || llmMode.includes("gemini") || llmMode.includes("openai") || llmMode.includes("gpt")) && 
+    !llmMode.includes("Fallback")
+  );
+
+  const statusLabel = isLlm ? "AI Advisory Active" : "AI Advisory • Demo Fallback";
+  const statusTooltip = isLlm
+    ? "Live LLM advisory layer active — recommendations are validated by the deterministic Policy Engine."
+    : "LLM unavailable — deterministic fallback active for reproducible simulation. Policy Engine is the sole execution authority.";
 
   return (
     <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-30 px-3.5 sm:px-6 py-3 sm:py-3.5 w-full max-w-full">
@@ -38,22 +47,22 @@ export default function Header({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">RecoverAI</h1>
-              <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-sky-950 text-sky-400 border border-sky-800 font-medium whitespace-nowrap">
-                Razorpay AI Track 03
-              </span>
               
-              {/* Dynamic LLM / Deterministic Mode Badge */}
-              <div className={`flex items-center gap-1.5 text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full font-semibold border max-w-full min-w-0 ${
-                isLlm 
-                  ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700' 
-                  : 'bg-amber-950/80 text-amber-300 border-amber-700'
-              }`}>
-                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${isLlm ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-                <span className="truncate">{llmMode || "Deterministic Fallback Mode"}</span>
+              {/* Dynamic Contextual AI Advisory Status Badge */}
+              <div 
+                title={statusTooltip}
+                className={`flex items-center gap-1.5 text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full font-semibold border max-w-full min-w-0 cursor-help ${
+                  isLlm 
+                    ? 'bg-emerald-950/80 text-emerald-400 border-emerald-700' 
+                    : 'bg-slate-950/90 text-slate-300 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full shrink-0 ${isLlm ? 'bg-emerald-400 animate-pulse' : 'bg-sky-400'}`}></span>
+                <span className="truncate">{statusLabel}</span>
               </div>
             </div>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 leading-tight sm:leading-normal">
-              Autonomous Revenue Recovery Agent with Deterministic Policy Guardrails
+              AI-Assisted Revenue Recovery with Deterministic Policy Guardrails
             </p>
           </div>
         </div>

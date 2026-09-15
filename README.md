@@ -1,6 +1,6 @@
 # RecoverAI-v2
 
-> **Autonomous Payment Recovery Decision Engine with Deterministic Safety Guardrails & Economic Expected-Value Optimization**
+> **AI-Assisted Payment Recovery Decision Engine with Deterministic Safety Guardrails & Economic Expected-Value Optimization**
 
 ```
 AI RECOMMENDS. ECONOMICS EVALUATES. POLICY ENGINE DECIDES.
@@ -18,7 +18,7 @@ If you are evaluating this project in a quick demo, follow this 5-step sequence:
 
 1. **Review 3-Way Comparative Economics (Overview Tab):**
    * Inspect the side-by-side performance comparison: **RecoverAI** vs. **Static Rule-Based Baseline** vs. **Naive Blind 3x Retries**.
-   * Observe how RecoverAI achieves **~73.5% revenue recovery** (84% transaction recovery) on Seed 42 while eliminating wasted retries and preserving **₹26.7L+** in revenue.
+   * Observe how RecoverAI achieves **~73.5% revenue recovery** (79.0% transaction recovery) on Seed 42 while eliminating wasted retries and preserving **₹26.7L+** in revenue.
 2. **Inspect Live 5-Stage Decision Pipeline (Transactions Tab):**
    * Click **Diagnose** on the highlighted demo transaction **`pay_fail_046_5050`** (`DO_NOT_HONOR`).
    * Trace the execution through all 5 layers:
@@ -137,14 +137,14 @@ Payment Event
 | Metric | RecoverAI Agent | Static Rule Baseline | Naive Blind Retries |
 | :--- | :---: | :---: | :---: |
 | **Revenue at Risk** | ₹36,36,475.84 | ₹36,36,475.84 | ₹36,36,475.84 |
-| **Simulated Gross Recovered** | **₹26,74,177.71** | ₹2,039,557.48 | ₹1,003,861.09 |
-| **Intervention Cost** | **₹2,555.00** | ₹1,155.00 | ₹5,360.00 |
-| **Simulated Net Recovered** | **₹26,71,622.71** | ₹2,038,402.48 | ₹9,98,501.09 |
+| **Simulated Gross Recovered** | **₹26,74,177.71** | ₹20,39,557.48 | ₹10,03,861.09 |
+| **Intervention Cost** | **₹2,555.00** | ₹1,175.00 | ₹5,360.00 |
+| **Simulated Net Recovered** | **₹26,71,622.71** | ₹20,38,382.48 | ₹9,98,501.09 |
 | **Revenue Recovery Rate** | **73.54%** | 56.09% | 27.61% |
-| **Transaction Recovery Rate** | **84.0%** (84/100) | 65.0% (65/100) | 24.0% (24/100) |
-| **Wasted / Failed Retries** | **0** | 12 | 76 |
-| **Policy Guardrail Overrides** | **15** | — | — |
-| **Fraud Attacks Contained** | **5 / 5 (100%)** | — | — |
+| **Transaction Recovery Rate** | **79.0%** (79/100) | 60.0% (60/100) | 24.0% (24/100) |
+| **Wasted / Failed Retries** | **0** | 10 | 228 |
+| **Policy Guardrail Overrides** | **5** | — | — |
+| **Fraud Attacks Contained** | **5 / 5 (100%)** | 5 / 5 (100%) | 0 / 5 (0%) |
 
 ---
 

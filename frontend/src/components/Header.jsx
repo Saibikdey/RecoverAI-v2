@@ -107,13 +107,13 @@ export default function Header({
       <div className="max-w-7xl mx-auto mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-slate-800/80 flex flex-col md:flex-row items-start md:items-center justify-between text-xs text-slate-400 gap-2 w-full min-w-0">
         <div className="flex items-start sm:items-center gap-1.5 sm:gap-2 min-w-0">
           <span className="font-semibold text-sky-400 flex items-center gap-1 shrink-0">
-            <Info className="w-3.5 h-3.5 shrink-0" /> Why AI?
+            <Info className="w-3.5 h-3.5 shrink-0" /> Core Principle:
           </span>
-          <span className="text-[11px] sm:text-xs leading-tight">AI performs contextual root-cause diagnosis and recommends an action; deterministic rules validate and authorize the action.</span>
+          <span className="text-[11px] sm:text-xs leading-tight font-medium text-slate-300">AI Recommends. Economics Evaluates. Policy Engine Decides.</span>
         </div>
         <div className="flex items-center gap-1.5 text-slate-300 bg-slate-950/70 px-2.5 py-1 rounded-md border border-slate-800 text-[11px] max-w-full min-w-0">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-          <span className="leading-tight">Policy Engine Invariant: LLM has zero direct financial authority</span>
+          <span className="leading-tight">Zero-Trust AI Boundary: Policy Engine is the sole execution authority</span>
         </div>
       </div>
     </header>

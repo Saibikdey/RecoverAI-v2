@@ -10,7 +10,9 @@ import {
   ArrowRight,
   Database,
   Binary,
-  FlaskConical
+  FlaskConical,
+  Scale,
+  DollarSign
 } from 'lucide-react';
 
 export default function ArchitectureView() {
@@ -24,14 +26,26 @@ export default function ArchitectureView() {
             <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base sm:text-lg font-bold text-white">System Architecture & Safety Invariant</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white">System Architecture & Safety Model</h3>
             <p className="text-[11px] sm:text-xs text-sky-300/80">Built for Razorpay AI Buildathon Track 03: AI Revenue Recovery Agent</p>
           </div>
         </div>
 
-        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-3 sm:mt-4 break-words">
-          <strong className="text-white">Why AI + Rules?</strong> Traditional payment recovery relies on rigid, blind retries that repeatedly trigger issuer declines, cause customer fatigue, and waste transaction fees. RecoverAI introduces contextual intelligence: 
-          <span className="text-sky-300 font-medium"> AI performs contextual root-cause diagnosis and recommends an action; deterministic rules validate and authorize the action.</span>
+        {/* Motto Banner */}
+        <div className="my-3 p-3 bg-slate-950/80 border border-sky-900/60 rounded-xl flex items-center justify-between flex-wrap gap-2 text-xs">
+          <span className="font-bold text-sky-300 tracking-wide flex flex-wrap items-center gap-2 text-xs sm:text-sm">
+            <span className="flex items-center gap-1"><Sparkles className="w-4 h-4 text-sky-400 shrink-0" /> AI RECOMMENDS.</span>
+            <span className="flex items-center gap-1"><Scale className="w-4 h-4 text-amber-400 shrink-0" /> ECONOMICS EVALUATES.</span>
+            <span className="flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" /> POLICY ENGINE DECIDES.</span>
+          </span>
+          <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+            Zero-Trust Authority Boundary
+          </span>
+        </div>
+
+        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed mt-3 break-words">
+          <strong className="text-white">Why AI + Economics + Policy?</strong> Traditional payment recovery relies on rigid, blind retries that repeatedly trigger issuer declines, cause customer fatigue, and waste transaction fees. RecoverAI introduces a 3-tier separation of concerns: 
+          <span className="text-sky-300 font-medium"> AI diagnoses root cause and proposes actions; Economics scores expected net payoff; Deterministic Policy Engine validates safety and authorizes execution.</span>
         </p>
 
         {/* Invariant Alert */}
@@ -46,55 +60,66 @@ export default function ArchitectureView() {
         </div>
       </div>
 
-      {/* 4-Stage Recovery Pipeline Visual */}
+      {/* 5-Stage Recovery Pipeline Visual */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-xl sm:rounded-2xl p-4 sm:p-6 min-w-0 max-w-full">
         <h4 className="text-xs sm:text-sm font-bold text-white mb-4 sm:mb-6 uppercase tracking-wider text-slate-400">
-          The 4-Stage Autonomous Recovery Pipeline
+          The 5-Stage Autonomous Recovery Pipeline
         </h4>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 relative min-w-0 max-w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 sm:gap-4 relative min-w-0 max-w-full">
           
           {/* Stage 1 */}
           <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-slate-800 relative min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3 font-mono">
               1
             </div>
             <h5 className="text-xs sm:text-sm font-bold text-white">Idempotency & Ingest</h5>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
-              Checks unique event_id to block duplicate execution, then evaluates risk score and customer tier.
+              Validates unique event_id to block duplicate execution and computes structured multidimensional risk profile.
             </p>
           </div>
 
           {/* Stage 2 */}
           <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-sky-900/50 relative min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-950 text-sky-400 border border-sky-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-sky-950 text-sky-400 border border-sky-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3 font-mono">
               2
             </div>
-            <h5 className="text-xs sm:text-sm font-bold text-sky-300">LLM Diagnosis</h5>
+            <h5 className="text-xs sm:text-sm font-bold text-sky-300">AI Diagnosis</h5>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
-              Produces structured JSON with root-cause analysis, confidence score, and advisory recovery action.
+              Produces structured root-cause analysis, confidence signal, and advisory recovery action (fallback if offline).
             </p>
           </div>
 
           {/* Stage 3 */}
-          <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-emerald-900/50 relative min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3">
+          <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-amber-900/50 relative min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-950 text-amber-400 border border-amber-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3 font-mono">
               3
             </div>
-            <h5 className="text-xs sm:text-sm font-bold text-emerald-300">Deterministic Policy</h5>
+            <h5 className="text-xs sm:text-sm font-bold text-amber-300">Economic Valuation</h5>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
-              Enforces Max Retries, Confidence Thresholds, Fraud Zero-Tolerance, and VIP Escalation with override logging.
+              Calculates expected gross recovery minus intervention cost to find economically optimal policy-eligible payoff.
             </p>
           </div>
 
           {/* Stage 4 */}
-          <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-indigo-900/50 relative min-w-0">
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-950 text-indigo-400 border border-indigo-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3">
+          <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-emerald-900/50 relative min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3 font-mono">
               4
+            </div>
+            <h5 className="text-xs sm:text-sm font-bold text-emerald-300">Policy Engine</h5>
+            <p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
+              Enforces Max Retries, Confidence Threshold, Fraud Zero-Tolerance, and VIP Escalation with full override tracking.
+            </p>
+          </div>
+
+          {/* Stage 5 */}
+          <div className="bg-slate-950 p-3.5 sm:p-4 rounded-xl border border-indigo-900/50 relative min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-950 text-indigo-400 border border-indigo-700 flex items-center justify-center font-bold text-xs mb-2.5 sm:mb-3 font-mono">
+              5
             </div>
             <h5 className="text-xs sm:text-sm font-bold text-indigo-300">Simulate & Audit</h5>
             <p className="text-[11px] sm:text-xs text-slate-400 mt-1 leading-relaxed">
-              Simulates recovery outcome under synthetic assumptions, persists event_id, and writes immutable audit log.
+              Executes recovery under synthetic assumptions, records fraud loss prevented, and writes immutable audit trail.
             </p>
           </div>
 

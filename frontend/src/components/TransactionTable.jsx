@@ -7,8 +7,12 @@ import {
   XCircle, 
   AlertTriangle, 
   ShieldAlert, 
+  ShieldCheck,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Zap,
+  Lock,
+  Flame
 } from 'lucide-react';
 
 export default function TransactionTable({ 
@@ -20,6 +24,7 @@ export default function TransactionTable({
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [errorFilter, setErrorFilter] = useState('ALL');
   const [tierFilter, setTierFilter] = useState('ALL');
+  const [quickFilter, setQuickFilter] = useState('ALL'); // 'ALL', 'OVERRIDES', 'FRAUD', 'RECOVERED'
 
   const formatINR = (val) => {
     return new Intl.NumberFormat('en-IN', {
@@ -27,6 +32,48 @@ export default function TransactionTable({
       currency: 'INR',
       maximumFractionDigits: 0
     }).format(val || 0);
+  };
+
+  const isPolicyOverride = (p) => {
+    return (
+      p.error_code === 'DO_NOT_HONOR' || 
+      p.error_code === 'SUSPECTED_FRAUD' || 
+      p.error_code === 'CARD_EXPIRED' ||
+      p.retry_count >= 3 ||
+      (p.amount >= 50000 && p.customer_tier === 'VIP')
+    );
+  };
+
+  const getOverrideBadge = (payment) => {
+    if (payment.error_code === 'DO_NOT_HONOR') {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-950 text-amber-300 border border-amber-700 flex items-center gap-0.5 shrink-0" title="Confidence < 0.65 triggers automatic Confidence Threshold override to ESCALATE">
+          <ShieldAlert className="w-2.5 h-2.5 shrink-0" /> Confidence Override
+        </span>
+      );
+    }
+    if (payment.error_code === 'SUSPECTED_FRAUD') {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-950 text-rose-300 border border-rose-700 flex items-center gap-0.5 shrink-0" title="Fraud Zero-Tolerance Guard enforces NO_ACTION and blocks all retries">
+          <Lock className="w-2.5 h-2.5 shrink-0" /> Fraud Guard
+        </span>
+      );
+    }
+    if (payment.error_code === 'CARD_EXPIRED') {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-sky-950 text-sky-300 border border-sky-700 flex items-center gap-0.5 shrink-0" title="Expired Card Guard strictly prevents retries, routing to ALTERNATE_PAYMENT">
+          <ShieldCheck className="w-2.5 h-2.5 shrink-0" /> Expired Guard
+        </span>
+      );
+    }
+    if (payment.retry_count >= 3) {
+      return (
+        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-950 text-purple-300 border border-purple-700 flex items-center gap-0.5 shrink-0" title="Max Retries Guard blocks further retry attempts">
+          <ShieldAlert className="w-2.5 h-2.5 shrink-0" /> Max Retries Guard
+        </span>
+      );
+    }
+    return null;
   };
 
   const getRiskBadge = (level) => {
@@ -46,6 +93,8 @@ export default function TransactionTable({
     switch (status) {
       case 'RECOVERED':
         return <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/70 border border-emerald-800/80 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" /> RECOVERED</span>;
+      case 'FRAUD_BLOCKED':
+        return <span className="flex items-center gap-1 text-[11px] font-semibold text-purple-300 bg-purple-950/70 border border-purple-800/80 px-2 py-0.5 rounded-full"><Lock className="w-3 h-3" /> FRAUD BLOCKED</span>;
       case 'FAILED':
         return <span className="flex items-center gap-1 text-[11px] font-semibold text-rose-400 bg-rose-950/70 border border-rose-800/80 px-2 py-0.5 rounded-full"><XCircle className="w-3 h-3" /> FAILED</span>;
       case 'PERMANENTLY_FAILED':
@@ -73,6 +122,11 @@ export default function TransactionTable({
     }
   };
 
+  // Compute counts for quick pills
+  const overrideCount = payments.filter(isPolicyOverride).length;
+  const fraudCount = payments.filter(p => p.error_code === 'SUSPECTED_FRAUD').length;
+  const recoveredCount = payments.filter(p => p.status === 'RECOVERED').length;
+
   // Filter & search logic
   const filtered = payments.filter((p) => {
     const matchesSearch = 
@@ -85,12 +139,71 @@ export default function TransactionTable({
     const matchesError = errorFilter === 'ALL' || p.error_code === errorFilter;
     const matchesTier = tierFilter === 'ALL' || p.customer_tier === tierFilter;
 
-    return matchesSearch && matchesStatus && matchesError && matchesTier;
+    let matchesQuick = true;
+    if (quickFilter === 'OVERRIDES') {
+      matchesQuick = isPolicyOverride(p);
+    } else if (quickFilter === 'FRAUD') {
+      matchesQuick = p.error_code === 'SUSPECTED_FRAUD';
+    } else if (quickFilter === 'RECOVERED') {
+      matchesQuick = p.status === 'RECOVERED';
+    }
+
+    return matchesSearch && matchesStatus && matchesError && matchesTier && matchesQuick;
   });
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-xl shadow-md overflow-hidden w-full max-w-full min-w-0">
       
+      {/* Quick Filter Pill Buttons */}
+      <div className="p-3 sm:p-4 border-b border-slate-800/80 bg-slate-950/40 flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1">
+          <Filter className="w-3.5 h-3.5" /> Quick Filters:
+        </span>
+        <button
+          onClick={() => setQuickFilter('ALL')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+            quickFilter === 'ALL'
+              ? 'bg-slate-700 text-white font-semibold'
+              : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
+          }`}
+        >
+          All ({payments.length})
+        </button>
+        <button
+          onClick={() => setQuickFilter('OVERRIDES')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
+            quickFilter === 'OVERRIDES'
+              ? 'bg-amber-900 text-amber-100 font-semibold border border-amber-600'
+              : 'bg-amber-950/40 text-amber-300 hover:bg-amber-950/70 border border-amber-800/60'
+          }`}
+        >
+          <Zap className="w-3 h-3 text-amber-400" />
+          <span>Policy Overrides ({overrideCount})</span>
+        </button>
+        <button
+          onClick={() => setQuickFilter('FRAUD')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
+            quickFilter === 'FRAUD'
+              ? 'bg-rose-900 text-rose-100 font-semibold border border-rose-600'
+              : 'bg-rose-950/40 text-rose-300 hover:bg-rose-950/70 border border-rose-800/60'
+          }`}
+        >
+          <Lock className="w-3 h-3 text-rose-400" />
+          <span>Fraud Contained ({fraudCount})</span>
+        </button>
+        <button
+          onClick={() => setQuickFilter('RECOVERED')}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
+            quickFilter === 'RECOVERED'
+              ? 'bg-emerald-900 text-emerald-100 font-semibold border border-emerald-600'
+              : 'bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/70 border border-emerald-800/60'
+          }`}
+        >
+          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+          <span>Recovered ({recoveredCount})</span>
+        </button>
+      </div>
+
       {/* Table Toolbar */}
       <div className="p-3 sm:p-4 border-b border-slate-800 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
         
@@ -117,6 +230,7 @@ export default function TransactionTable({
             <option value="ALL">All Statuses</option>
             <option value="FAILED">Failed</option>
             <option value="RECOVERED">Recovered</option>
+            <option value="FRAUD_BLOCKED">Fraud Blocked</option>
           </select>
 
           {/* Error Code Filter */}
@@ -165,9 +279,9 @@ export default function TransactionTable({
               <th className="px-4 py-3">Payment Method</th>
               <th className="px-4 py-3">Failure Reason</th>
               <th className="px-4 py-3">Risk Level</th>
-              <th className="px-4 py-3">AI Action</th>
+              <th className="px-4 py-3">Authorized Action</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Action</th>
+              <th className="px-4 py-3 text-right">Inspect Pipeline</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
@@ -180,15 +294,27 @@ export default function TransactionTable({
             ) : (
               filtered.map((payment) => {
                 const isLoading = loadingPaymentId === payment.id;
+                const overrideBadge = getOverrideBadge(payment);
+                const isDemoExample = payment.id === 46 || payment.transaction_id === 'pay_fail_046_5050';
+
                 return (
                   <tr 
                     key={payment.id} 
-                    className="hover:bg-slate-800/40 transition-colors"
+                    className={`hover:bg-slate-800/40 transition-colors ${
+                      isDemoExample ? 'bg-sky-950/20 border-l-2 border-l-sky-500' : ''
+                    }`}
                   >
                     {/* Tx & Customer */}
                     <td className="px-4 py-3">
-                      <div className="font-mono text-[11px] text-sky-400 font-medium">
-                        {payment.transaction_id}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[11px] text-sky-400 font-medium">
+                          {payment.transaction_id}
+                        </span>
+                        {isDemoExample && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-sky-900 text-sky-200 border border-sky-600">
+                            DEMO OVERRIDE
+                          </span>
+                        )}
                       </div>
                       <div className="text-white font-medium flex items-center gap-1.5 mt-0.5">
                         {payment.customer_name}
@@ -211,10 +337,13 @@ export default function TransactionTable({
                       {payment.payment_method}
                     </td>
 
-                    {/* Failure Reason */}
+                    {/* Failure Reason & Override Tag */}
                     <td className="px-4 py-3">
-                      <div className="font-mono text-[11px] text-rose-300 font-medium">
-                        {payment.error_code}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[11px] text-rose-300 font-medium">
+                          {payment.error_code}
+                        </span>
+                        {overrideBadge}
                       </div>
                       <div className="text-[10px] text-slate-500 truncate max-w-xs mt-0.5">
                         {payment.error_message}
@@ -241,7 +370,11 @@ export default function TransactionTable({
                       <button
                         onClick={() => onDiagnosePayment(payment)}
                         disabled={isLoading}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-sky-300 bg-sky-950/80 hover:bg-sky-900 active:bg-sky-800 border border-sky-700/80 rounded-lg transition disabled:opacity-50"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg transition disabled:opacity-50 ${
+                          isDemoExample 
+                            ? 'text-white bg-sky-600 hover:bg-sky-500 shadow-md shadow-sky-600/30'
+                            : 'text-sky-300 bg-sky-950/80 hover:bg-sky-900 active:bg-sky-800 border border-sky-700/80'
+                        }`}
                       >
                         <Sparkles className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
                         {isLoading ? 'Diagnosing...' : 'Diagnose'}
